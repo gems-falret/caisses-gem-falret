@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caisses GEM — Fondation Falret</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,#08235e 0%,#0d3494 35%,#1649b8 65%,#0b2e80 100%);
+  position:relative;overflow:hidden;padding:2rem;
+}
+
+/* ── Lumière centrale douce ── */
+body::before{
+  content:'';position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:70vw;height:70vh;
+  background:radial-gradient(ellipse,rgba(100,160,255,0.12) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+
+/* ── Groupes de silhouettes ── */
+.bg-figures{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.fig-group{position:absolute}
+
+@keyframes float {0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)}}
+@keyframes float2{0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)}}
+@keyframes float3{0%,100%{transform:translateY(-6px)} 50%{transform:translateY(6px)}}
+
+/* Bas gauche — grand groupe */
+.fg1{bottom:-18px;left:-35px;opacity:.16;animation:float 9s ease-in-out infinite}
+/* Haut droite — moyen groupe, penché */
+.fg2{top:-12px;right:-50px;opacity:.12;animation:float2 11s ease-in-out infinite 2s;transform-origin:center bottom}
+/* Milieu gauche — petit, discret */
+.fg3{top:18%;left:2%;opacity:.08;animation:float3 10s ease-in-out infinite 1s}
+/* Bas droite */
+.fg4{bottom:4%;right:-25px;opacity:.13;animation:float 12s ease-in-out infinite 3.5s}
+/* Haut centre-gauche */
+.fg5{top:2%;left:22%;opacity:.07;animation:float2 8s ease-in-out infinite 4s}
+/* Milieu droite */
+.fg6{top:38%;right:1%;opacity:.09;animation:float3 13s ease-in-out infinite 0.5s}
+
+/* ── En-tête de page ── */
+.page-header{
+  text-align:center;margin-bottom:2rem;
+  color:white;position:relative;z-index:1;
+}
+.falret-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.14);
+  border:1px solid rgba(255,255,255,0.28);
+  border-radius:30px;padding:5px 16px;
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(255,255,255,0.9);margin-bottom:1.25rem;
+  backdrop-filter:blur(4px);
+}
+.page-header h1{
+  font-size:34px;font-weight:800;letter-spacing:-.5px;line-height:1.2;
+  margin-bottom:.6rem;
+  text-shadow:0 2px 16px rgba(0,0,0,0.25);
+}
+.page-header p{
+  font-size:15px;font-weight:400;color:rgba(255,255,255,0.65);letter-spacing:.03em;
+}
+
+/* ── Carte de connexion ── */
+.login-card{
+  background:rgba(255,255,255,0.97);
+  border-radius:22px;
+  padding:2.25rem 2.5rem 2rem;
+  width:100%;max-width:400px;
+  box-shadow:0 28px 70px rgba(0,0,0,0.28),0 1px 0 rgba(255,255,255,0.2) inset;
+  position:relative;z-index:1;
+  border:1px solid rgba(255,255,255,0.5);
+}
+.card-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:.3rem}
+.card-sub{font-size:13px;color:#999;margin-bottom:1.75rem;line-height:1.4}
+
+.field{margin-bottom:1.1rem}
+.field label{
+  display:block;font-size:11px;color:#555;margin-bottom:7px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+}
+.field input{
+  width:100%;padding:11px 14px;
+  border:1.5px solid #ebebeb;border-radius:12px;
+  font-size:14px;outline:none;background:#f9f9fb;
+  transition:all .15s;font-family:inherit;color:#1a1a1a;
+}
+.field input:focus{
+  border-color:#1649b8;background:white;
+  box-shadow:0 0 0 4px rgba(22,73,184,0.1);
+}
+.field input::placeholder{color:#bbb}
+
+.btn-login{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,#1649b8 0%,#1e5cd4 100%);
+  color:white;border:none;border-radius:13px;
+  font-size:15px;font-weight:600;cursor:pointer;
+  margin-top:.6rem;transition:all .18s;
+  font-family:inherit;letter-spacing:.01em;
+  box-shadow:0 4px 16px rgba(22,73,184,0.3);
+}
+.btn-login:hover{
+  background:linear-gradient(135deg,#1240a8 0%,#1649b8 100%);
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(22,73,184,0.4);
+}
+.btn-login:active{transform:translateY(0);box-shadow:0 2px 8px rgba(22,73,184,0.2)}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+.error{
+  background:#fff2f2;color:#c0392b;
+  padding:10px 14px;border-radius:10px;
+  font-size:13px;margin-top:1rem;display:none;
+  border:1px solid #fcc;
+}
+.loading-msg{text-align:center;color:#999;font-size:13px;margin-top:1rem;display:none}
+
+.card-divider{height:1px;background:linear-gradient(90deg,transparent,#ebebeb,transparent);margin:1.75rem 0 1.5rem}
+.card-footer{text-align:center;font-size:12px;color:#bbb;line-height:1.5}
+
+/* ── Note bas de page ── */
+.page-footer{
+  text-align:center;font-size:11px;color:rgba(255,255,255,0.38);
+  margin-top:1.75rem;position:relative;z-index:1;letter-spacing:.03em;
+}
+</style>
+</head>
+<body>
+
+<!-- Silhouettes de fond -->
+<div class="bg-figures">
+
+  <!-- fg1 : 5 personnes, bas-gauche, grand -->
+  <div class="fig-group fg1">
+    <svg width="320" height="90" viewBox="0 0 275 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="3">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="28" y1="21" x2="28" y2="49"/>
+      <line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/>
+      <line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="83" y1="21" x2="83" y2="49"/>
+      <line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/>
+      <line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="138" y1="21" x2="138" y2="49"/>
+      <line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="165.5" y2="43"/>
+      <line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+
+      <circle cx="193" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="193" y1="21" x2="193" y2="49"/>
+      <line x1="165.5" y1="43" x2="193" y2="31"/><line x1="193" y1="31" x2="220.5" y2="43"/>
+      <line x1="193" y1="49" x2="181" y2="70"/><line x1="193" y1="49" x2="205" y2="70"/>
+
+      <circle cx="248" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="248" y1="21" x2="248" y2="49"/>
+      <line x1="220.5" y1="43" x2="248" y2="31"/><line x1="248" y1="31" x2="276" y2="43"/>
+      <line x1="248" y1="49" x2="236" y2="70"/><line x1="248" y1="49" x2="260" y2="70"/>
+    </svg>
+  </div>
+
+  <!-- fg2 : 4 personnes, haut-droite -->
+  <div class="fig-group fg2">
+    <svg width="260" height="90" viewBox="0 0 220 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="28" y1="21" x2="28" y2="49"/>
+      <line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/>
+      <line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="83" y1="21" x2="83" y2="49"/>
+      <line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/>
+      <line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="138" y1="21" x2="138" y2="49"/>
+      <line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="165.5" y2="43"/>
+      <line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+
+      <circle cx="193" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="193" y1="21" x2="193" y2="49"/>
+      <line x1="165.5" y1="43" x2="193" y2="31"/><line x1="193" y1="31" x2="221" y2="43"/>
+      <line x1="193" y1="49" x2="181" y2="70"/><line x1="193" y1="49" x2="205" y2="70"/>
+    </svg>
+  </div>
+
+  <!-- fg3 : 3 personnes, milieu-gauche, petit -->
+  <div class="fig-group fg3">
+    <svg width="155" height="70" viewBox="0 0 165 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="28" y1="21" x2="28" y2="49"/>
+      <line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/>
+      <line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="83" y1="21" x2="83" y2="49"/>
+      <line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/>
+      <line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="138" y1="21" x2="138" y2="49"/>
+      <line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="166" y2="43"/>
+      <line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+    </svg>
+  </div>
+
+  <!-- fg4 : 4 personnes, bas-droite -->
+  <div class="fig-group fg4">
+    <svg width="250" height="88" viewBox="0 0 220 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="28" y1="21" x2="28" y2="49"/>
+      <line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/>
+      <line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="83" y1="21" x2="83" y2="49"/>
+      <line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/>
+      <line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="138" y1="21" x2="138" y2="49"/>
+      <line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="165.5" y2="43"/>
+      <line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+
+      <circle cx="193" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="193" y1="21" x2="193" y2="49"/>
+      <line x1="165.5" y1="43" x2="193" y2="31"/><line x1="193" y1="31" x2="221" y2="43"/>
+      <line x1="193" y1="49" x2="181" y2="70"/><line x1="193" y1="49" x2="205" y2="70"/>
+    </svg>
+  </div>
+
+  <!-- fg5 : 2 personnes, haut centre -->
+  <div class="fig-group fg5">
+    <svg width="130" height="65" viewBox="0 0 110 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="28" y1="21" x2="28" y2="49"/>
+      <line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/>
+      <line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="83" y1="21" x2="83" y2="49"/>
+      <line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="111" y2="43"/>
+      <line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+    </svg>
+  </div>
+
+  <!-- fg6 : 3 personnes, droite milieu -->
+  <div class="fig-group fg6">
+    <svg width="160" height="72" viewBox="0 0 165 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="28" y1="21" x2="28" y2="49"/>
+      <line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/>
+      <line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="83" y1="21" x2="83" y2="49"/>
+      <line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/>
+      <line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/>
+      <line x1="138" y1="21" x2="138" y2="49"/>
+      <line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="166" y2="43"/>
+      <line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+    </svg>
+  </div>
+
+  <!-- ── Objets décoratifs ─────────────────────────────────────── -->
+
+  <!-- Livre — haut gauche -->
+  <div style="position:absolute;top:7%;left:7%;opacity:.12;animation:float 10s ease-in-out infinite 2s">
+    <svg width="52" height="66" viewBox="0 0 30 38" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8">
+      <rect x="1" y="1" width="28" height="36" rx="2"/>
+      <line x1="6" y1="1" x2="6" y2="37"/>
+      <line x1="10" y1="10" x2="24" y2="10"/>
+      <line x1="10" y1="16" x2="24" y2="16"/>
+      <line x1="10" y1="22" x2="24" y2="22"/>
+      <line x1="10" y1="28" x2="20" y2="28"/>
+    </svg>
+  </div>
+
+  <!-- Cœur — droite -->
+  <div style="position:absolute;top:18%;right:7%;opacity:.13;animation:float2 8s ease-in-out infinite 1s">
+    <svg width="56" height="50" viewBox="0 0 24 22" fill="white">
+      <path d="M12 20C12 20 1 13 1 6.5C1 3.5 3.5 1 6.5 1C8.5 1 10.2 2 12 4.5C13.8 2 15.5 1 17.5 1C20.5 1 23 3.5 23 6.5C23 13 12 20 12 20Z"/>
+    </svg>
+  </div>
+
+  <!-- Tasse café — bas droite -->
+  <div style="position:absolute;bottom:13%;right:7%;opacity:.11;animation:float3 12s ease-in-out infinite 1.5s">
+    <svg width="55" height="62" viewBox="0 0 36 44" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      <path d="M4 12 L7 34 L29 34 L32 12 Z"/>
+      <path d="M32 17 Q42 17 42 23 Q42 29 32 29"/>
+      <ellipse cx="18" cy="36.5" rx="16" ry="3.5"/>
+      <path d="M10 8 Q12 4 10 1"/>
+      <path d="M18 8 Q20 4 18 1"/>
+      <path d="M26 8 Q28 4 26 1"/>
+    </svg>
+  </div>
+
+  <!-- Note musicale — haut droite -->
+  <div style="position:absolute;top:5%;right:19%;opacity:.10;animation:float 7s ease-in-out infinite 3.5s">
+    <svg width="36" height="50" viewBox="0 0 22 32" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      <ellipse cx="6" cy="27" rx="6" ry="4" fill="white" stroke="none"/>
+      <line x1="12" y1="27" x2="12" y2="2"/>
+      <line x1="12" y1="2" x2="22" y2="6"/>
+      <line x1="22" y1="6" x2="22" y2="10"/>
+    </svg>
+  </div>
+
+  <!-- Bulle dialogue — gauche milieu -->
+  <div style="position:absolute;top:43%;left:3%;opacity:.09;animation:float2 9s ease-in-out infinite 4s">
+    <svg width="62" height="52" viewBox="0 0 44 36" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8">
+      <path d="M2 0 L42 0 Q44 0 44 2 L44 22 Q44 24 42 24 L16 24 L8 34 L11 24 L2 24 Q0 24 0 22 L0 2 Q0 0 2 0 Z"/>
+      <line x1="8" y1="9" x2="36" y2="9"/>
+      <line x1="8" y1="16" x2="26" y2="16"/>
+    </svg>
+  </div>
+
+  <!-- Étoile — haut centre -->
+  <div style="position:absolute;top:3%;left:45%;opacity:.10;animation:float3 11s ease-in-out infinite">
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="white">
+      <polygon points="12,1 14.5,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9.5,9"/>
+    </svg>
+  </div>
+
+  <!-- Feuille — bas gauche -->
+  <div style="position:absolute;bottom:21%;left:9%;opacity:.09;animation:float 13s ease-in-out infinite 2.5s">
+    <svg width="44" height="54" viewBox="0 0 24 30" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8">
+      <path d="M12 28 Q0 20 0 10 Q0 0 12 0 Q24 0 24 10 Q24 20 12 28 Z"/>
+      <line x1="12" y1="28" x2="12" y2="2"/>
+      <path d="M12 20 Q6 15 4 10"/>
+      <path d="M12 14 Q18 10 20 6"/>
+    </svg>
+  </div>
+
+  <!-- Maison — bas centre -->
+  <div style="position:absolute;bottom:3%;left:43%;opacity:.09;animation:float3 10s ease-in-out infinite 3s">
+    <svg width="48" height="48" viewBox="0 0 36 36" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      <polyline points="2,16 18,2 34,16"/>
+      <rect x="5" y="16" width="26" height="18"/>
+      <rect x="13" y="23" width="10" height="11"/>
+    </svg>
+  </div>
+
+  <!-- Livre — milieu droite -->
+  <div style="position:absolute;top:52%;right:3%;opacity:.08;animation:float2 11s ease-in-out infinite 0.5s">
+    <svg width="44" height="56" viewBox="0 0 30 38" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8">
+      <rect x="1" y="1" width="28" height="36" rx="2"/>
+      <line x1="6" y1="1" x2="6" y2="37"/>
+      <line x1="10" y1="10" x2="24" y2="10"/>
+      <line x1="10" y1="16" x2="24" y2="16"/>
+      <line x1="10" y1="22" x2="24" y2="22"/>
+    </svg>
+  </div>
+
+  <!-- Petit cœur — milieu gauche bas -->
+  <div style="position:absolute;bottom:37%;left:14%;opacity:.08;animation:float 14s ease-in-out infinite 1s">
+    <svg width="32" height="28" viewBox="0 0 24 22" fill="white">
+      <path d="M12 20C12 20 1 13 1 6.5C1 3.5 3.5 1 6.5 1C8.5 1 10.2 2 12 4.5C13.8 2 15.5 1 17.5 1C20.5 1 23 3.5 23 6.5C23 13 12 20 12 20Z"/>
+    </svg>
+  </div>
+
+  <!-- Petite étoile — bas droite -->
+  <div style="position:absolute;top:67%;right:16%;opacity:.08;animation:float2 9s ease-in-out infinite 2s">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
+      <polygon points="12,1 14.5,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9.5,9"/>
+    </svg>
+  </div>
+
+  <!-- Note musicale 2 — bas gauche -->
+  <div style="position:absolute;bottom:28%;left:3%;opacity:.07;animation:float3 15s ease-in-out infinite 5s">
+    <svg width="28" height="40" viewBox="0 0 22 32" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      <ellipse cx="6" cy="27" rx="6" ry="4" fill="white" stroke="none"/>
+      <line x1="12" y1="27" x2="12" y2="2"/>
+      <line x1="12" y1="2" x2="22" y2="6"/>
+      <line x1="22" y1="6" x2="22" y2="10"/>
+    </svg>
+  </div>
+
+</div>
+
+<!-- En-tête -->
+<div class="page-header" style="position:relative;z-index:1">
+  <div class="falret-badge">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Fondation Falret
+  </div>
+  <h1>Groupe d'Entraide<br>Mutuelle</h1>
+  <p>Gestion des caisses — Accès sécurisé</p>
+</div>
+
+<!-- Carte connexion -->
+<div class="login-card">
+  <p class="card-title">Connexion</p>
+  <p class="card-sub">Réservé aux responsables GEM et à la comptabilité Falret</p>
+
+  <div class="field">
+    <label>Adresse email</label>
+    <input type="email" id="email" placeholder="votre@email.fr" autocomplete="email">
+  </div>
+  <div class="field">
+    <label>Mot de passe</label>
+    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+
+  <button class="btn-login" id="btn-login" onclick="login()">Se connecter</button>
+  <div class="error" id="error-msg"></div>
+  <div class="loading-msg" id="loading">Connexion en cours…</div>
+
+  <div class="card-divider"></div>
+  <div class="card-footer">
+    Vos données sont hébergées de manière sécurisée<br>par la Fondation Falret
+  </div>
+</div>
+
+<p class="page-footer">© 2026 Fondation Falret — Tous droits réservés</p>
+
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+const SUPABASE_URL='https://ivrdhnlyvfpsduetnwcr.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cmRobmx5dmZwc2R1ZXRud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MjAxNzMsImV4cCI6MjA5MjI5NjE3M30.HLxYoEAm5Ag0HN2WoxHFoduG_czA9qryXo7mks-rAC0';
+const supabase=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+document.getElementById('password').addEventListener('keypress',e=>{if(e.key==='Enter')login();});
+document.getElementById('email').addEventListener('keypress',e=>{if(e.key==='Enter')document.getElementById('password').focus();});
+
+window.login=async function(){
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const btn=document.getElementById('btn-login');
+  const error=document.getElementById('error-msg');
+  const loading=document.getElementById('loading');
+  if(!email||!password){
+    error.style.display='block';
+    error.textContent='Merci de remplir tous les champs.';
+    return;
+  }
+  btn.disabled=true;
+  error.style.display='none';
+  loading.style.display='block';
+  const{data,error:authError}=await supabase.auth.signInWithPassword({email,password});
+  if(authError){
+    error.style.display='block';
+    error.textContent='Email ou mot de passe incorrect.';
+    btn.disabled=false;loading.style.display='none';
+    return;
+  }
+  const{data:profil}=await supabase.from('profils').select('*').eq('id',data.user.id).single();
+  if(!profil){
+    error.style.display='block';
+    error.textContent='Profil introuvable. Contactez la comptabilité.';
+    btn.disabled=false;loading.style.display='none';
+    return;
+  }
+  localStorage.setItem('falret_user',JSON.stringify({
+    id:data.user.id,email:data.user.email,
+    gem:profil.gem,dossier:profil.dossier,role:profil.role,
+    compte:profil.compte,analytique:profil.analytique,journal:profil.journal
+  }));
+  if(profil.role==='compta')window.location.href='compta.html';
+  else if(profil.role==='coordinatrice')window.location.href='coordinatrice.html';
+  else window.location.href='gem.html';
+};
+</script>
+</body>
+</html>

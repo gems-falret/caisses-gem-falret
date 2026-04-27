@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contrôle des caisses — Falret</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(150deg,#08235e 0%,#0d3494 35%,#1649b8 65%,#0b2e80 100%) fixed;background-attachment:fixed;min-height:100vh}
+.topbar{background:rgba(255,255,255,0.97);backdrop-filter:blur(8px);padding:1rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.5);box-shadow:0 2px 12px rgba(0,0,0,0.15);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.bg-layer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden}
+.container{position:relative;z-index:1}
+#vue-liste,#vue-detail{position:relative;z-index:1}
+@keyframes bgfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes bgfloat2{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes bgfloat3{0%,100%{transform:translateY(-5px)}50%{transform:translateY(7px)}}
+.topbar h1{font-size:16px;font-weight:600;color:#1a1a1a}
+.btn-logout{font-size:13px;color:#888;background:none;border:none;cursor:pointer}
+.btn-back{border:none;background:#f0f0f0;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:500}
+.btn-back:hover{background:#e5e5e5}
+.container{max-width:980px;margin:0 auto;padding:1.5rem}
+.mois-select{padding:6px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:white}
+
+/* ── Liste ── */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem}
+.mc{background:white;border-radius:12px;padding:1rem;border:1px solid #eee}
+.mc-label{font-size:12px;color:#888;margin-bottom:4px}
+.mc-val{font-size:22px;font-weight:700}
+.filters{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.filter-btn{padding:6px 14px;border-radius:8px;border:1px solid #ddd;background:white;color:#888;font-size:13px;cursor:pointer}
+.filter-btn.active{background:#1a1a1a;color:white;border-color:#1a1a1a}
+.table-wrap{background:white;border-radius:14px;border:1px solid #eee;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{padding:10px 14px;text-align:left;color:#888;font-weight:500;border-bottom:1px solid #eee;white-space:nowrap}
+.tbl td{padding:10px 14px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:#fafafa;cursor:pointer}
+.badge{display:inline-block;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:500}
+.b-ok{background:#dcfce7;color:#16a34a}
+.b-warn{background:#fef9c3;color:#854d0e}
+.b-err{background:#fee2e2;color:#dc2626}
+.b-wait{background:#f0f0f0;color:#888}
+.jt-btn{padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid #ddd;border-radius:6px;background:white;font-family:inherit}
+.jt-btn.ok{background:#dcfce7;color:#16a34a;border-color:#86efac}
+.jt-btn.warn{background:#fef9c3;color:#854d0e;border-color:#fde047}
+.jt-btn.err{background:#fee2e2;color:#dc2626;border-color:#fca5a5}
+
+/* ── Détail ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1rem}
+.kpi{background:white;border-radius:12px;padding:.875rem 1rem;border:1px solid #eee}
+.kpi-label{font-size:11px;color:#888;margin-bottom:3px}
+.kpi-val{font-size:17px;font-weight:700}
+
+/* Tabs */
+.tabs{display:flex;background:white;border-radius:12px;border:1px solid #eee;overflow:hidden;margin-bottom:1.25rem}
+.tab{flex:1;padding:12px 4px;border:none;background:none;font-size:12px;cursor:pointer;color:#888;border-bottom:3px solid transparent;transition:all .12s;font-family:inherit;font-weight:500}
+.tab.active{color:#1a1a1a;border-bottom-color:#1a1a1a;font-weight:600;background:#fafafa}
+.tab:hover:not(.active){background:#f5f5f5;color:#555}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Cards */
+.card{background:white;border-radius:14px;padding:1.25rem;margin-bottom:1rem;border:1px solid #eee}
+.card-title{font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:.25rem}
+.section-label{font-size:11px;font-weight:600;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+.info-cell{background:#f8f8f8;border-radius:10px;padding:.75rem 1rem}
+.info-cell-label{font-size:11px;color:#888;margin-bottom:3px}
+.info-cell-val{font-size:14px;font-weight:600;color:#1a1a1a}
+
+/* Tables inline */
+.tbl-inline{width:100%;border-collapse:collapse;font-size:13px}
+.tbl-inline th{padding:8px 12px;text-align:left;color:#888;font-weight:500;border-bottom:1px solid #eee;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+.tbl-inline td{padding:9px 12px;border-bottom:1px solid #f5f5f5;color:#1a1a1a}
+.tbl-inline tr:last-child td{border-bottom:none}
+.total-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8f8f8;border-radius:8px;margin-top:.75rem;font-weight:600;font-size:14px}
+
+/* Dep card */
+.dep-card{background:white;border:1px solid #F7C1C1;border-radius:12px;margin-bottom:.75rem;overflow:hidden}
+.dep-header{display:flex;justify-content:space-between;align-items:center;padding:.75rem 1rem;background:#fff5f5;border-bottom:1px solid #F7C1C1}
+.dep-body{padding:1rem}
+.dep-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:.75rem}
+.dep-meta-item label{font-size:11px;color:#888;display:block;margin-bottom:3px}
+.dep-meta-item span{font-size:13px;color:#1a1a1a}
+
+/* Part/cotis cards */
+.part-card{background:white;border:1px solid #9FE1CB;border-radius:12px;padding:1rem;margin-bottom:.75rem}
+.cotis-card{background:white;border:1px solid #fde047;border-radius:12px;padding:1rem;margin-bottom:.75rem}
+
+/* Justif */
+.justif-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 8px;border-radius:6px;cursor:pointer;border:none;margin:2px;font-family:inherit}
+.justif-link:hover{background:#bfdbfe}
+.no-justif{font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px;display:inline-block}
+.justif-ok{background:#f0fdf4;border-radius:8px;padding:8px 10px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:#0F6E56}
+
+/* Comptage */
+.comptage-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.comptage-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.comptage-tbl th{padding:7px 10px;text-align:left;color:#888;font-size:11px;font-weight:500;border-bottom:1px solid #eee}
+.comptage-tbl td{padding:7px 10px;border-bottom:1px solid #f5f5f5;color:#1a1a1a}
+.comptage-tbl tr:last-child td{border-bottom:none}
+.comptage-tbl td.zero{color:#ccc}
+.comptage-sub{display:flex;justify-content:space-between;padding:7px 10px;background:#f0f0f0;border-radius:6px;margin-top:6px;font-size:13px;font-weight:600}
+.ecart-box{padding:10px 14px;border-radius:8px;font-size:13px;margin-top:.75rem}
+.ecart-parfait{background:#dcfce7;color:#16a34a}
+.ecart-pos{background:#dcfce7;color:#16a34a}
+.ecart-neg{background:#fef9c3;color:#854d0e}
+
+/* Obs */
+.obs-bloc{background:#fffbeb;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#92400e}
+
+/* CEGI */
+.cegi-block{background:#f8f8f8;border-radius:10px;padding:1rem;font-family:'SF Mono',Monaco,monospace;font-size:11px;overflow-x:auto}
+.crow{display:grid;grid-template-columns:78px 32px 90px 72px 32px 82px 1fr 66px 66px;gap:2px;padding:2px 0}
+.crow.hdr{border-bottom:1px solid #eee;padding-bottom:5px;margin-bottom:4px}
+.crow.cadj{background:#fef9c3;border-radius:3px}
+.crow.clast{background:#dbeafe;border-radius:3px}
+.cc{padding:1px 3px;font-size:11px;color:#1a1a1a;overflow:hidden;white-space:nowrap}
+.ch{padding:1px 3px;font-size:11px;color:#888;font-weight:500}
+.editable{border:none;background:transparent;font-family:inherit;font-size:11px;color:#1a1a1a;width:100%;outline:none}
+.editable:focus{background:white;border-radius:3px;padding:0 2px}
+.adj-row{display:grid;grid-template-columns:90px 1fr 60px 90px 80px 30px;gap:5px;align-items:center;padding:6px 8px;background:#f8f8f8;border-radius:8px;margin-bottom:5px}
+.adj-inp{font-size:12px;border:1px solid #eee;border-radius:6px;padding:4px 6px;width:100%;font-family:inherit;background:white}
+.add-adj-btn{width:100%;padding:7px;border:1px dashed #ddd;border-radius:8px;background:none;color:#888;font-size:12px;cursor:pointer;text-align:left;margin-top:4px;font-family:inherit}
+.note-area{width:100%;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:13px;resize:vertical;min-height:70px;font-family:inherit}
+.btn-copy{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+.btn-valider{background:#1a1a1a;color:white;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-family:inherit}
+.btn-valider:hover{background:#333}
+.btn-valider.devalider{background:#dc2626}
+.btn-valider.devalider:hover{background:#b91c1c}
+.empty{text-align:center;color:#aaa;font-size:13px;padding:2rem;font-style:italic}
+.locked-banner{background:#dbeafe;border:1px solid #93c5fd;border-radius:10px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#1d4ed8;display:flex;align-items:center;gap:8px}
+</style>
+</head>
+<body>
+<!-- Fond illustré -->
+<div class="bg-layer">
+  <!-- Personnes bas-gauche -->
+  <div style="position:absolute;bottom:-15px;left:-30px;opacity:.10;animation:bgfloat 10s ease-in-out infinite">
+    <svg width="300" height="82" viewBox="0 0 275 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/><line x1="28" y1="21" x2="28" y2="49"/><line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/><line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/><line x1="83" y1="21" x2="83" y2="49"/><line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/><line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/><line x1="138" y1="21" x2="138" y2="49"/><line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="165.5" y2="43"/><line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+      <circle cx="193" cy="11" r="10" fill="white" stroke="none"/><line x1="193" y1="21" x2="193" y2="49"/><line x1="165.5" y1="43" x2="193" y2="31"/><line x1="193" y1="31" x2="220.5" y2="43"/><line x1="193" y1="49" x2="181" y2="70"/><line x1="193" y1="49" x2="205" y2="70"/>
+      <circle cx="248" cy="11" r="10" fill="white" stroke="none"/><line x1="248" y1="21" x2="248" y2="49"/><line x1="220.5" y1="43" x2="248" y2="31"/><line x1="248" y1="31" x2="276" y2="43"/><line x1="248" y1="49" x2="236" y2="70"/><line x1="248" y1="49" x2="260" y2="70"/>
+    </svg>
+  </div>
+  <!-- Personnes haut-droite -->
+  <div style="position:absolute;top:-10px;right:-40px;opacity:.09;animation:bgfloat2 12s ease-in-out infinite 2s">
+    <svg width="230" height="78" viewBox="0 0 220 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/><line x1="28" y1="21" x2="28" y2="49"/><line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/><line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/><line x1="83" y1="21" x2="83" y2="49"/><line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="110.5" y2="43"/><line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+      <circle cx="138" cy="11" r="10" fill="white" stroke="none"/><line x1="138" y1="21" x2="138" y2="49"/><line x1="110.5" y1="43" x2="138" y2="31"/><line x1="138" y1="31" x2="165.5" y2="43"/><line x1="138" y1="49" x2="126" y2="70"/><line x1="138" y1="49" x2="150" y2="70"/>
+      <circle cx="193" cy="11" r="10" fill="white" stroke="none"/><line x1="193" y1="21" x2="193" y2="49"/><line x1="165.5" y1="43" x2="193" y2="31"/><line x1="193" y1="31" x2="221" y2="43"/><line x1="193" y1="49" x2="181" y2="70"/><line x1="193" y1="49" x2="205" y2="70"/>
+    </svg>
+  </div>
+  <!-- Livre haut-gauche -->
+  <div style="position:absolute;top:7%;left:5%;opacity:.09;animation:bgfloat 11s ease-in-out infinite 1s">
+    <svg width="46" height="58" viewBox="0 0 30 38" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="1" y="1" width="28" height="36" rx="2"/><line x1="6" y1="1" x2="6" y2="37"/><line x1="10" y1="10" x2="24" y2="10"/><line x1="10" y1="16" x2="24" y2="16"/><line x1="10" y1="22" x2="24" y2="22"/></svg>
+  </div>
+  <!-- Cœur droite haut -->
+  <div style="position:absolute;top:20%;right:4%;opacity:.09;animation:bgfloat2 8s ease-in-out infinite 3s">
+    <svg width="50" height="46" viewBox="0 0 24 22" fill="white"><path d="M12 20C12 20 1 13 1 6.5C1 3.5 3.5 1 6.5 1C8.5 1 10.2 2 12 4.5C13.8 2 15.5 1 17.5 1C20.5 1 23 3.5 23 6.5C23 13 12 20 12 20Z"/></svg>
+  </div>
+  <!-- Calculatrice/carnet compta — haut droite -->
+  <div style="position:absolute;top:5%;right:14%;opacity:.09;animation:bgfloat3 9s ease-in-out infinite 2s">
+    <svg width="38" height="50" viewBox="0 0 26 34" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="1" y="1" width="24" height="32" rx="2"/><rect x="4" y="4" width="18" height="8" rx="1"/><circle cx="7" cy="18" r="2" fill="white" stroke="none"/><circle cx="13" cy="18" r="2" fill="white" stroke="none"/><circle cx="19" cy="18" r="2" fill="white" stroke="none"/><circle cx="7" cy="25" r="2" fill="white" stroke="none"/><circle cx="13" cy="25" r="2" fill="white" stroke="none"/><circle cx="19" cy="25" r="2" fill="white" stroke="none"/></svg>
+  </div>
+  <!-- Étoile centre haut -->
+  <div style="position:absolute;top:3%;left:44%;opacity:.08;animation:bgfloat 13s ease-in-out infinite 4s">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="white"><polygon points="12,1 14.5,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9.5,9"/></svg>
+  </div>
+  <!-- Tasse café bas-droite -->
+  <div style="position:absolute;bottom:8%;right:5%;opacity:.08;animation:bgfloat2 14s ease-in-out infinite 1s">
+    <svg width="48" height="54" viewBox="0 0 36 44" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 12 L7 34 L29 34 L32 12 Z"/><path d="M32 17 Q42 17 42 23 Q42 29 32 29"/><ellipse cx="18" cy="36.5" rx="16" ry="3.5"/><path d="M10 8 Q12 4 10 1"/><path d="M18 8 Q20 4 18 1"/><path d="M26 8 Q28 4 26 1"/></svg>
+  </div>
+  <!-- Note musicale gauche -->
+  <div style="position:absolute;top:40%;left:2%;opacity:.07;animation:bgfloat3 10s ease-in-out infinite 3s">
+    <svg width="30" height="44" viewBox="0 0 22 32" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="6" cy="27" rx="6" ry="4" fill="white" stroke="none"/><line x1="12" y1="27" x2="12" y2="2"/><line x1="12" y1="2" x2="22" y2="6"/><line x1="22" y1="6" x2="22" y2="10"/></svg>
+  </div>
+  <!-- Livre droite milieu -->
+  <div style="position:absolute;top:50%;right:2%;opacity:.07;animation:bgfloat 12s ease-in-out infinite 5s">
+    <svg width="38" height="50" viewBox="0 0 30 38" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="1" y="1" width="28" height="36" rx="2"/><line x1="6" y1="1" x2="6" y2="37"/><line x1="10" y1="10" x2="24" y2="10"/><line x1="10" y1="16" x2="24" y2="16"/><line x1="10" y1="22" x2="24" y2="22"/></svg>
+  </div>
+  <!-- Maison bas centre -->
+  <div style="position:absolute;bottom:5%;left:42%;opacity:.08;animation:bgfloat2 11s ease-in-out infinite 2s">
+    <svg width="44" height="44" viewBox="0 0 36 36" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><polyline points="2,16 18,2 34,16"/><rect x="5" y="16" width="26" height="18"/><rect x="13" y="23" width="10" height="11"/></svg>
+  </div>
+  <!-- Petit cœur bas gauche -->
+  <div style="position:absolute;bottom:30%;left:4%;opacity:.07;animation:bgfloat3 13s ease-in-out infinite 1.5s">
+    <svg width="30" height="27" viewBox="0 0 24 22" fill="white"><path d="M12 20C12 20 1 13 1 6.5C1 3.5 3.5 1 6.5 1C8.5 1 10.2 2 12 4.5C13.8 2 15.5 1 17.5 1C20.5 1 23 3.5 23 6.5C23 13 12 20 12 20Z"/></svg>
+  </div>
+  <!-- Personnes milieu-droite -->
+  <div style="position:absolute;top:40%;right:-20px;opacity:.07;animation:bgfloat3 14s ease-in-out infinite 3s">
+    <svg width="140" height="70" viewBox="0 0 110 80" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2">
+      <circle cx="28" cy="11" r="10" fill="white" stroke="none"/><line x1="28" y1="21" x2="28" y2="49"/><line x1="0" y1="43" x2="28" y2="31"/><line x1="28" y1="31" x2="55.5" y2="43"/><line x1="28" y1="49" x2="16" y2="70"/><line x1="28" y1="49" x2="40" y2="70"/>
+      <circle cx="83" cy="11" r="10" fill="white" stroke="none"/><line x1="83" y1="21" x2="83" y2="49"/><line x1="55.5" y1="43" x2="83" y2="31"/><line x1="83" y1="31" x2="111" y2="43"/><line x1="83" y1="49" x2="71" y2="70"/><line x1="83" y1="49" x2="95" y2="70"/>
+    </svg>
+  </div>
+</div>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px">
+    <button id="btn-back" class="btn-back" style="display:none" onclick="window.backToList()">← Retour</button>
+    <h1 id="topbar-title">Fondation Falret — Contrôle des caisses</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <select class="mois-select" id="mois-select" onchange="window.loadCaisses()"></select>
+    <button class="btn-logout" onclick="window.doLogout()">Déconnexion</button>
+  </div>
+</div>
+
+<!-- Vue liste -->
+<div id="vue-liste" class="container">
+  <div class="metrics">
+    <div class="mc"><div class="mc-label">Total GEM</div><div class="mc-val" id="cnt-total">—</div></div>
+    <div class="mc"><div class="mc-label">Validés</div><div class="mc-val" style="color:#16a34a" id="cnt-ok">0</div></div>
+    <div class="mc"><div class="mc-label">À vérifier</div><div class="mc-val" style="color:#854d0e" id="cnt-warn">0</div></div>
+    <div class="mc"><div class="mc-label">En attente</div><div class="mc-val" style="color:#888" id="cnt-wait">0</div></div>
+  </div>
+  <div class="filters">
+    <button class="filter-btn active" onclick="window.setFilter('tous',this)">Tous</button>
+    <button class="filter-btn" onclick="window.setFilter('valide',this)">Validés</button>
+    <button class="filter-btn" onclick="window.setFilter('en_attente',this)">En attente</button>
+    <button class="filter-btn" onclick="window.setFilter('anomalie',this)">Anomalie</button>
+  </div>
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr>
+        <th>GEM</th><th>Dossier</th><th>Avances</th><th>Dépenses</th><th>Participations</th><th>Solde clôture</th><th>Justificatifs</th><th>Statut</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Vue détail -->
+<div id="vue-detail" style="display:none" class="container">
+  <div class="kpi-grid" id="kpi-grid"></div>
+  <div class="tabs">
+    <button class="tab active" onclick="window.switchTab('resume',this)">Résumé</button>
+    <button class="tab" onclick="window.switchTab('avances',this)">Avances</button>
+    <button class="tab" onclick="window.switchTab('depenses',this)">Dépenses</button>
+    <button class="tab" onclick="window.switchTab('participations',this)">Participations</button>
+    <button class="tab" onclick="window.switchTab('comptage',this)">Comptage</button>
+    <button class="tab" onclick="window.switchTab('ecriture',this)">Écriture</button>
+  </div>
+  <div id="tab-resume" class="tab-content active"></div>
+  <div id="tab-avances" class="tab-content"></div>
+  <div id="tab-depenses" class="tab-content"></div>
+  <div id="tab-participations" class="tab-content"></div>
+  <div id="tab-comptage" class="tab-content"></div>
+  <div id="tab-ecriture" class="tab-content"></div>
+</div>
+
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+const SUPABASE_URL='https://ivrdhnlyvfpsduetnwcr.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cmRobmx5dmZwc2R1ZXRud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MjAxNzMsImV4cCI6MjA5MjI5NjE3M30.HLxYoEAm5Ag0HN2WoxHFoduG_czA9qryXo7mks-rAC0';
+const supabase=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const GEMS_CONFIG={
+  'Argenteuil':{compte:'53109000',anal:'55/AR',journal:'CA09'},
+  'Le Chesnay':{compte:'53102000',anal:'55/CH',journal:'CA02'},
+  'Eaubonne':{compte:'53112000',anal:'55/EA',journal:'CA12'},
+  'Fontenay-sous-Bois':{compte:'53113000',anal:'55/FB',journal:'CA13'},
+  'Garennes-Colombes':{compte:'53107000',anal:'55/GC',journal:'CA07'},
+  'Maurepas-La Verrière':{compte:'53116000',anal:'55/MA',journal:'CA16'},
+  'Mureaux':{compte:'53104000',anal:'55/MX',journal:'CA04'},
+  'Nanterre':{compte:'53106000',anal:'55/NA',journal:'CA06'},
+  'Nogent':{compte:'53108000',anal:'55/NO',journal:'CA08'},
+  'Neuilly':{compte:'53117000',anal:'55/NS',journal:'CA17'},
+  'Paris TSA':{compte:'53115000',anal:'55/P1',journal:'CA15'},
+  'Pontoise':{compte:'53110000',anal:'55/PO',journal:'CA10'},
+  'Versailles':{compte:'53103000',anal:'55/VE',journal:'CA03'},
+  'Choisy':{compte:'53101000',anal:'91/G1',journal:'CA01'},
+  'Vitry':{compte:'53102000',anal:'91/G2',journal:'CA02'},
+};
+
+const BILLETS=[200,100,50,20,10,5];
+const PIECES=[2,1,0.5,0.2,0.1,0.05,0.02,0.01];
+
+let USER=null,caisses=[],currentFilter='tous';
+let currentCaisse=null,currentDeps=[],currentParts=[],currentAvances=[];
+let adjustments={},notesCompta={};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function nomFichier(url){
+  const base=url.split('/').pop();
+  const idx=base.indexOf('_');
+  return idx>=0?base.slice(idx+1):base;
+}
+
+window.voirJustif=async function(path){
+  const win=window.open('','_blank');
+  const{data,error}=await supabase.storage.from('justificatifs').createSignedUrl(path,3600);
+  if(data&&data.signedUrl){win.location.href=data.signedUrl;}
+  else{if(win)win.close();alert('Impossible d\'ouvrir le justificatif.');}
+};
+
+function fmt(n){return(n||0).toFixed(2).replace('.',',');}
+function moisNom(){
+  const sel=document.getElementById('mois-select');
+  return sel.options[sel.selectedIndex]?.text||'';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+async function init(){
+  const stored=localStorage.getItem('falret_user');
+  if(!stored){window.location.href='index.html';return;}
+  USER=JSON.parse(stored);
+  if(USER.role!=='compta'){window.location.href='index.html';return;}
+  initMoisSelect();
+  await loadCaisses();
+}
+
+function initMoisSelect(){
+  const sel=document.getElementById('mois-select');
+  const now=new Date();
+  const noms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    const opt=document.createElement('option');
+    opt.value=val;opt.textContent=noms[d.getMonth()]+' '+d.getFullYear();
+    sel.appendChild(opt);
+  }
+}
+
+// ── Vue liste ─────────────────────────────────────────────────────────────────
+
+async function loadCaisses(){
+  const mois=document.getElementById('mois-select').value;
+  const{data}=await supabase.from('caisses').select('*').eq('mois',mois).order('gem');
+  caisses=data||[];
+  renderTable();
+  updateMetrics();
+}
+window.loadCaisses=loadCaisses;
+
+function updateMetrics(){
+  const all=Object.keys(GEMS_CONFIG).length;
+  document.getElementById('cnt-total').textContent=all;
+  document.getElementById('cnt-ok').textContent=caisses.filter(c=>c.statut==='valide').length;
+  document.getElementById('cnt-warn').textContent=caisses.filter(c=>c.statut==='anomalie').length;
+  document.getElementById('cnt-wait').textContent=all-caisses.filter(c=>c.statut!=='en_attente'||true).length+caisses.filter(c=>c.statut==='en_attente').length+(all-caisses.length);
+}
+
+window.setFilter=function(val,el){
+  currentFilter=val;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+};
+
+function renderTable(){
+  const tbody=document.getElementById('tbody');
+  const allGems=Object.keys(GEMS_CONFIG);
+  let rows='';
+  allGems.forEach(gem=>{
+    const c=caisses.find(x=>x.gem===gem);
+    const statut=c?c.statut:'vide';
+    if(currentFilter==='tous'||(currentFilter==='valide'&&statut==='valide')||(currentFilter==='en_attente'&&(!c||statut==='en_attente'))||(currentFilter==='anomalie'&&statut==='anomalie')){
+      const cfg=GEMS_CONFIG[gem];
+      const statutBadge=statut==='valide'?'<span class="badge b-ok">✓ Validé</span>':statut==='anomalie'?'<span class="badge b-err">⚠ Anomalie</span>':c?'<span class="badge b-warn">À vérifier</span>':'<span class="badge b-wait">En attente</span>';
+      const justif=c?c.statut_justificatifs:'—';
+      const justifLabel={complets:'Complets',incomplets:'Incomplets',manquant:'Manquants'};
+      const justifClass={complets:'ok',incomplets:'warn',manquant:'err'};
+      const justifBtn=c?`<button class="jt-btn ${justifClass[justif]||''}" onclick="window.cycleJustif('${c.id}','${justif}',event)">${justifLabel[justif]||justif}</button>`:'<span style="color:#ccc">—</span>';
+      rows+=`<tr onclick="window.openDetail('${gem}')">
+        <td style="font-weight:600">${gem}</td>
+        <td><span class="badge b-wait" style="font-size:10px">${cfg.anal}</span></td>
+        <td style="color:#16a34a">${c?'+'+fmt(c.total_avances)+' €':'—'}</td>
+        <td style="color:#dc2626">${c?'-'+fmt(c.total_depenses)+' €':'—'}</td>
+        <td style="color:#16a34a">${c?'+'+fmt(c.total_participations)+' €':'—'}</td>
+        <td style="font-weight:600">${c?fmt(c.solde_cloture)+' €':'—'}</td>
+        <td onclick="event.stopPropagation()">${justifBtn}</td>
+        <td>${statutBadge}</td>
+        <td onclick="event.stopPropagation()"><button class="jt-btn" onclick="window.openDetail('${gem}')">Ouvrir →</button></td>
+      </tr>`;
+    }
+  });
+  tbody.innerHTML=rows||'<tr><td colspan="9" style="text-align:center;color:#aaa;padding:2rem">Aucun résultat</td></tr>';
+}
+
+async function cycleJustif(id,current,e){
+  e.stopPropagation();
+  const cycle={complets:'incomplets',incomplets:'manquant',manquant:'complets'};
+  await supabase.from('caisses').update({statut_justificatifs:cycle[current]||'complets'}).eq('id',id);
+  await loadCaisses();
+}
+window.cycleJustif=cycleJustif;
+
+// ── Vue détail ────────────────────────────────────────────────────────────────
+
+window.openDetail=async function(gem){
+  const c=caisses.find(x=>x.gem===gem);
+  currentCaisse=c||null;
+  currentDeps=[];currentParts=[];currentAvances=[];
+
+  if(c){
+    if(!adjustments[c.id])adjustments[c.id]=[];
+    if(c.statut_saisie==='brouillon'&&c.donnees_brouillon){
+      const db=c.donnees_brouillon;
+      currentAvances=(db.avances||[]).map(a=>({
+        id:a.id,caisse_id:c.id,date_avance:a.date||null,montant:a.montant||0
+      }));
+      currentDeps=(db.deps||[]).map(d=>({
+        id:d.id,caisse_id:c.id,
+        date_depense:d.date||null,
+        fournisseur:d.fournisseur||'',
+        categorie:(d.ventils||[]).filter(v=>v.cat).map(v=>v.cat.label).join(', ')||'—',
+        compte:(d.ventils||[]).filter(v=>v.cat).map(v=>v.cat.compte).join(', ')||'—',
+        montant:(d.ventils||[]).reduce((s,v)=>s+(v.montant||0),0),
+        justificatif_url:d.justificatif_url||''
+      }));
+      currentParts=(db.parts||[]).map(p=>({
+        id:p.id,caisse_id:c.id,
+        libelle:p.libelle||'',montant:p.montant||0,
+        type:p.type||'participation',justificatif_url:p.justificatif_url||''
+      }));
+    } else {
+      const[dr,pr,ar]=await Promise.all([
+        supabase.from('depenses').select('*').eq('caisse_id',c.id),
+        supabase.from('participations').select('*').eq('caisse_id',c.id),
+        supabase.from('avances').select('*').eq('caisse_id',c.id),
+      ]);
+      currentDeps=dr.data||[];
+      currentParts=pr.data||[];
+      currentAvances=ar.data||[];
+    }
+  }
+
+  document.getElementById('vue-liste').style.display='none';
+  document.getElementById('vue-detail').style.display='block';
+  document.getElementById('btn-back').style.display='inline-block';
+  document.getElementById('topbar-title').textContent='GEM '+gem+' — '+moisNom();
+
+  renderKpiGrid();
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.tab:first-child').classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-resume').classList.add('active');
+  renderTabResume();
+};
+
+window.backToList=function(){
+  document.getElementById('vue-detail').style.display='none';
+  document.getElementById('vue-liste').style.display='block';
+  document.getElementById('btn-back').style.display='none';
+  document.getElementById('topbar-title').textContent='Fondation Falret — Contrôle des caisses';
+  currentCaisse=null;
+  loadCaisses();
+};
+
+function renderKpiGrid(){
+  const c=currentCaisse;
+  if(!c){document.getElementById('kpi-grid').innerHTML='';return;}
+  document.getElementById('kpi-grid').innerHTML=`
+    <div class="kpi"><div class="kpi-label">Solde ouverture</div><div class="kpi-val">${fmt(c.solde_ouverture)} €</div></div>
+    <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Avances reçues</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
+    <div class="kpi" style="border-color:#fecaca"><div class="kpi-label">Total dépenses</div><div class="kpi-val" style="color:#dc2626">-${fmt(c.total_depenses)} €</div></div>
+    <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Participations</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_participations)} €</div></div>
+    <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde clôture</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
+  `;
+}
+
+window.switchTab=function(name,el){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(el)el.classList.add('active');
+  else document.querySelector(`.tab[onclick*="'${name}'"]`)?.classList.add('active');
+  const fns={resume:renderTabResume,avances:renderTabAvances,depenses:renderTabDepenses,participations:renderTabParticipations,comptage:renderTabComptage,ecriture:renderTabEcriture};
+  fns[name]?.();
+};
+
+// ── Tab : Résumé ──────────────────────────────────────────────────────────────
+
+function renderTabResume(){
+  const el=document.getElementById('tab-resume');
+  const c=currentCaisse;
+  if(!c){el.innerHTML='<div class="card"><div class="empty">Aucune saisie reçue pour ce mois.</div></div>';return;}
+  const cfg=GEMS_CONFIG[c.gem]||{};
+  const statutBadge=c.statut==='valide'?'<span class="badge b-ok">✓ Validé</span>':c.statut==='anomalie'?'<span class="badge b-err">⚠ Anomalie</span>':'<span class="badge b-warn">À vérifier</span>';
+  const justifBadge=c.statut_justificatifs==='complets'?'<span class="badge b-ok">Complets</span>':c.statut_justificatifs==='incomplets'?'<span class="badge b-warn">Incomplets</span>':'<span class="badge b-err">Manquants</span>';
+  const nDepsOk=currentDeps.filter(d=>d.justificatif_url&&d.justificatif_url.length>0).length;
+
+  const isBrouillon=c.statut_saisie==='brouillon';
+  el.innerHTML=`
+    ${isBrouillon?`<div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#854d0e;display:flex;align-items:center;gap:8px">📝 Cette caisse est un <strong>brouillon</strong> — elle n'a pas encore été envoyée par le GEM.</div>`:''}
+    <div class="card">
+      <div class="section-label">Informations générales</div>
+      <div class="info-grid">
+        <div class="info-cell"><div class="info-cell-label">GEM</div><div class="info-cell-val">${c.gem}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Responsable de caisse</div><div class="info-cell-val">${c.responsable||'—'}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Mois</div><div class="info-cell-val">${moisNom()}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Dossier / Analytique</div><div class="info-cell-val">${c.dossier||'—'} — ${cfg.anal||'—'}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Statut saisie</div><div class="info-cell-val">${isBrouillon?'<span class="badge b-warn">Brouillon</span>':'<span class="badge b-ok">Envoyé</span>'}</div></div>
+        <div class="info-cell"><div class="info-cell-label">Justificatifs</div><div class="info-cell-val">${justifBadge} <span style="font-size:12px;color:#888">${nDepsOk}/${currentDeps.length} dép.</span></div></div>
+      </div>
+      ${c.notes?`<div class="section-label">Observations du GEM</div><div class="obs-bloc">${c.notes}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="section-label">Notes de contrôle</div>
+      <textarea class="note-area" id="note-ctrl" placeholder="Ajouter une note de contrôle interne...">${notesCompta[c.id]||''}</textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.875rem">
+        <button class="jt-btn" onclick="window.saveNote()">Enregistrer la note</button>
+        <button class="btn-valider${c.statut==='valide'?' devalider':''}" onclick="window.validerCaisse('${c.id}')">${c.statut==='valide'?'Dévalider la caisse':'✓ Valider la caisse'}</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Tab : Avances ─────────────────────────────────────────────────────────────
+
+function renderTabAvances(){
+  const el=document.getElementById('tab-avances');
+  const avances=currentAvances;
+  const total=avances.reduce((s,a)=>s+(a.montant||0),0);
+  if(!avances.length){el.innerHTML='<div class="card"><div class="empty">Aucune avance enregistrée ce mois.</div></div>';return;}
+  el.innerHTML=`
+    <div class="card">
+      <div class="section-label">Avances reçues (${avances.length})</div>
+      <table class="tbl-inline">
+        <thead><tr><th>#</th><th>Date</th><th style="text-align:right">Montant</th></tr></thead>
+        <tbody>
+          ${avances.map((a,i)=>`<tr>
+            <td style="color:#888">${i+1}</td>
+            <td>${a.date_avance||'—'}</td>
+            <td style="text-align:right;color:#16a34a;font-weight:600">+${fmt(a.montant)} €</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="total-row">
+        <span>Total avances</span>
+        <span style="color:#16a34a">+${fmt(total)} €</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── Tab : Dépenses ────────────────────────────────────────────────────────────
+
+function renderTabDepenses(){
+  const el=document.getElementById('tab-depenses');
+  const deps=currentDeps;
+  const total=deps.reduce((s,d)=>s+(d.montant||0),0);
+  if(!deps.length){
+    el.innerHTML='<div style="border-left:3px solid #E24B4A;background:#FCEBEB;border-radius:0 14px 14px 0;padding:1.25rem"><div class="empty">Aucune dépense enregistrée ce mois.</div></div>';
+    return;
+  }
+  const cards=deps.map((d,i)=>{
+    const urls=(d.justificatif_url||'').split(',').filter(u=>u.trim());
+    const ok=urls.length>0&&d.categorie&&d.date_depense&&d.fournisseur;
+    return`<div class="dep-card">
+      <div class="dep-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:22px;height:22px;border-radius:50%;background:#E24B4A;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:white;flex-shrink:0">${i+1}</div>
+          <span style="font-size:13px;font-weight:600">${d.fournisseur||'—'}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:6px;background:${ok?'#dcfce7':'#fef9c3'};color:${ok?'#16a34a':'#854d0e'}">${ok?'Complet':'Justificatif manquant'}</span>
+        </div>
+        <span style="font-size:15px;font-weight:700;color:#dc2626">${fmt(d.montant)} €</span>
+      </div>
+      <div class="dep-body">
+        <div class="dep-meta">
+          <div class="dep-meta-item"><label>Date</label><span>${d.date_depense||'—'}</span></div>
+          <div class="dep-meta-item"><label>Catégorie</label><span>${d.categorie||'—'}</span></div>
+          <div class="dep-meta-item"><label>Compte</label><span style="font-family:monospace;font-size:12px">${d.compte||'—'}</span></div>
+        </div>
+        ${urls.length>0?`<div class="justif-ok">✅ Justificatif(s) : ${urls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}</div>`:`<span class="no-justif">❌ Pas de justificatif</span>`}
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div style="border-left:3px solid #E24B4A;background:#FCEBEB;border-radius:0 14px 14px 0;padding:1.25rem">
+    <div style="font-size:11px;font-weight:600;color:#A32D2D;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem">Dépenses du mois (${deps.length})</div>
+    ${cards}
+    <div class="total-row" style="background:#ffe4e4"><span>Total dépenses</span><span style="color:#dc2626">-${fmt(total)} €</span></div>
+  </div>`;
+}
+
+// ── Tab : Participations ──────────────────────────────────────────────────────
+
+function renderTabParticipations(){
+  const el=document.getElementById('tab-participations');
+  const parts=currentParts;
+  if(!parts.length){
+    el.innerHTML='<div style="border-left:3px solid #1D9E75;background:#E1F5EE;border-radius:0 14px 14px 0;padding:1.25rem"><div class="empty">Aucune participation enregistrée ce mois.</div></div>';
+    return;
+  }
+  const participations=parts.filter(p=>!p.type||p.type==='participation');
+  const cotisations=parts.filter(p=>p.type==='cotisation');
+  const tPart=participations.reduce((s,p)=>s+(p.montant||0),0);
+  const tCotis=cotisations.reduce((s,p)=>s+(p.montant||0),0);
+
+  const card=(p,isCotis)=>{
+    const urls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
+    return`<div class="${isCotis?'cotis-card':'part-card'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-size:14px;font-weight:600">${p.libelle||'—'}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">Compte : ${isCotis?'75600000':'70820000'}</div>
+        </div>
+        <span style="font-size:15px;font-weight:700;color:#16a34a">+${fmt(p.montant)} €</span>
+      </div>
+      ${urls.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${urls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}</div>`:`<span class="no-justif">❌ Pas de justificatif</span>`}
+    </div>`;
+  };
+
+  let html='<div style="border-left:3px solid #1D9E75;background:#E1F5EE;border-radius:0 14px 14px 0;padding:1.25rem">';
+  if(participations.length){
+    html+=`<div style="font-size:11px;font-weight:600;color:#0F6E56;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem">Participations adhérents (${participations.length})</div>`;
+    html+=participations.map(p=>card(p,false)).join('');
+    html+=`<div class="total-row" style="background:#d1fae5;margin-bottom:${cotisations.length?'1.25rem':'.25rem'}"><span>Total participations</span><span style="color:#16a34a">+${fmt(tPart)} €</span></div>`;
+  }
+  if(cotisations.length){
+    html+=`<div style="font-size:11px;font-weight:600;color:#854d0e;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem">Cotisations adhérents (${cotisations.length})</div>`;
+    html+=cotisations.map(p=>card(p,true)).join('');
+    html+=`<div class="total-row" style="background:#fef9c3"><span>Total cotisations</span><span style="color:#854d0e">+${fmt(tCotis)} €</span></div>`;
+  }
+  if(participations.length&&cotisations.length){
+    html+=`<div class="total-row" style="background:#d1fae5;margin-top:.75rem;font-size:15px"><span>Total général</span><span style="color:#16a34a">+${fmt(tPart+tCotis)} €</span></div>`;
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+// ── Tab : Comptage ────────────────────────────────────────────────────────────
+
+function renderTabComptage(){
+  const el=document.getElementById('tab-comptage');
+  const c=currentCaisse;
+  if(!c||!c.comptage){
+    el.innerHTML='<div class="card"><div class="empty">Les données de comptage ne sont pas disponibles pour cette caisse.<br><small style="color:#aaa">Le GEM doit enregistrer un brouillon à l\'étape 3 pour que les données soient transmises.</small></div></div>';
+    return;
+  }
+  const cpt=c.comptage;
+  let tB=0,tP=0;
+
+  const billetsRows=BILLETS.map(v=>{
+    const n=(cpt.billets&&cpt.billets[String(v)])||0;
+    const sub=Math.round(v*n*100)/100;tB+=sub;
+    return n>0
+      ?`<tr><td>${v} €</td><td style="text-align:center">${n}</td><td style="text-align:right;font-weight:600">${sub.toFixed(2)} €</td></tr>`
+      :`<tr><td class="zero">${v} €</td><td class="zero" style="text-align:center">0</td><td class="zero" style="text-align:right">—</td></tr>`;
+  }).join('');
+
+  const piecesRows=PIECES.map(v=>{
+    const n=(cpt.pieces&&cpt.pieces[String(v)])||0;
+    const sub=Math.round(v*n*100)/100;tP+=sub;
+    const label=v>=1?v+' €':Math.round(v*100)+' c';
+    return n>0
+      ?`<tr><td>${label}</td><td style="text-align:center">${n}</td><td style="text-align:right;font-weight:600">${sub.toFixed(2)} €</td></tr>`
+      :`<tr><td class="zero">${label}</td><td class="zero" style="text-align:center">0</td><td class="zero" style="text-align:right">—</td></tr>`;
+  }).join('');
+
+  tB=Math.round(tB*100)/100;tP=Math.round(tP*100)/100;
+  const total=Math.round((tB+tP)*100)/100;
+  const theo=c.solde_cloture;
+  const ecart=Math.round((total-theo)*100)/100;
+  const ecartHtml=Math.abs(ecart)<0.01
+    ?`<div class="ecart-box ecart-parfait">✅ Caisse conforme — total compté = solde théorique : ${fmt(theo)} €</div>`
+    :ecart>0
+      ?`<div class="ecart-box ecart-pos">📈 Écart positif de +${fmt(ecart)} € (compté ${fmt(total)} € / théorique ${fmt(theo)} €)</div>`
+      :`<div class="ecart-box ecart-neg">📉 Écart négatif de ${fmt(ecart)} € (compté ${fmt(total)} € / théorique ${fmt(theo)} €)</div>`;
+
+  el.innerHTML=`<div class="card">
+    <div class="section-label">Comptage de la caisse</div>
+    <div class="comptage-grid">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:8px">Billets</div>
+        <table class="comptage-tbl"><thead><tr><th>Valeur</th><th style="text-align:center">Qté</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>${billetsRows}</tbody></table>
+        <div class="comptage-sub"><span>Total billets</span><span>${fmt(tB)} €</span></div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:8px">Pièces</div>
+        <table class="comptage-tbl"><thead><tr><th>Valeur</th><th style="text-align:center">Qté</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>${piecesRows}</tbody></table>
+        <div class="comptage-sub"><span>Total pièces</span><span>${fmt(tP)} €</span></div>
+      </div>
+    </div>
+    <div class="total-row" style="font-size:15px;margin-top:1rem"><span>Total compté</span><span>${fmt(total)} €</span></div>
+    <div style="display:flex;justify-content:space-between;padding:10px 12px;border:1px solid #eee;border-radius:8px;margin-top:.5rem;font-size:13px">
+      <span style="color:#888">Solde théorique (clôture)</span><span style="font-weight:600">${fmt(theo)} €</span>
+    </div>
+    ${ecartHtml}
+  </div>`;
+}
+
+// ── Tab : Écriture ────────────────────────────────────────────────────────────
+
+function renderTabEcriture(){
+  const c=currentCaisse;
+  if(!c){document.getElementById('tab-ecriture').innerHTML='<div class="card"><div class="empty">Aucune saisie reçue pour ce mois.</div></div>';return;}
+  const cfg=GEMS_CONFIG[c.gem]||{};
+  const moisStr=document.getElementById('mois-select').value;
+  const mp=moisStr.split('-');
+  const ref=`CAISSE ${mp[1]}/${mp[0].slice(2)}`;
+  const dateE=`31/${mp.reverse().join('/')}`;
+
+  function buildRows(){
+    const rows=[];
+    const grouped={};
+    currentDeps.forEach(d=>{
+      const comptes=d.compte?d.compte.split(', '):['Autres'];
+      const cats=d.categorie?d.categorie.split(', '):['DIVERS'];
+      comptes.forEach((compte,i)=>{
+        if(!grouped[compte])grouped[compte]={compte,lib:(cats[i]||cats[0]||'DIVERS').toUpperCase(),montant:0};
+        grouped[compte].montant+=d.montant/comptes.length;
+      });
+    });
+    Object.values(grouped).forEach(g=>rows.push({compte:g.compte,anal:cfg.anal||'',lib:g.lib,debit:Math.round(g.montant*100)/100,credit:0,adj:false}));
+    const parts=currentParts||[];
+    const tPart=parts.filter(p=>!p.type||p.type==='participation').reduce((s,p)=>s+(p.montant||0),0);
+    const tCotis=parts.filter(p=>p.type==='cotisation').reduce((s,p)=>s+(p.montant||0),0);
+    if(tPart>0)rows.push({compte:'70820000',anal:cfg.anal||'',lib:'PARTICIPATIONS ADHERENTS',debit:0,credit:Math.round(tPart*100)/100,adj:false});
+    if(tCotis>0)rows.push({compte:'75600000',anal:cfg.anal||'',lib:'COTISATIONS ADHERENTS',debit:0,credit:Math.round(tCotis*100)/100,adj:false});
+    (adjustments[c.id]||[]).forEach(a=>rows.push({...a,adj:true}));
+    const tD=rows.reduce((s,r)=>s+r.debit,0),tC=rows.reduce((s,r)=>s+r.credit,0);
+    rows.push({compte:cfg.compte||'531XXXXX',anal:cfg.anal||'',lib:`CAISSE ${c.gem.toUpperCase()} ${ref}`,debit:0,credit:Math.round((tD-tC)*100)/100,last:true});
+    return rows;
+  }
+
+  function render(){
+    const rows=buildRows();
+    const tD=rows.reduce((s,r)=>s+r.debit,0),tC=rows.reduce((s,r)=>s+r.credit,0);
+    const eq=Math.abs(tD-tC)<0.01;
+    const adj=adjustments[c.id]||[];
+
+    document.getElementById('tab-ecriture').innerHTML=`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div>
+            <div class="card-title">Journal ${cfg.journal||'CA??'} — ${moisNom()}</div>
+            <div style="font-size:12px;color:#888;margin-top:3px">Réf. : ${ref}</div>
+          </div>
+          <button class="btn-copy" id="btn-copy-ecr" onclick="window._copierEcr()">Copier tout</button>
+        </div>
+        <div style="font-size:12px;color:#888;margin-bottom:.5rem">
+          <span style="background:#fef9c3;padding:1px 5px;border-radius:3px;margin-right:6px">Orange = ajustement manuel</span>
+          <span style="background:#dbeafe;padding:1px 5px;border-radius:3px">Bleu = solde caisse</span>
+        </div>
+        <div class="cegi-block">
+          <div class="crow hdr">${['Date','Doss.','Compte','Anal.','Type','Réf.','Libellé','Débit','Crédit'].map(h=>`<span class="ch">${h}</span>`).join('')}</div>
+          <div id="cegi-rows">${rows.map((r,i)=>`<div class="crow${r.last?' clast':r.adj?' cadj':''}">
+            <span class="cc">${dateE}</span><span class="cc">55</span>
+            <span class="cc">${r.compte}</span><span class="cc">${r.anal}</span>
+            <span class="cc">ES</span><span class="cc">${ref}</span>
+            <span class="cc"><input class="editable" id="clib-${i}" value="${r.lib}"></span>
+            <span class="cc" style="text-align:right;color:#dc2626">${r.debit>0?r.debit.toFixed(2):''}</span>
+            <span class="cc" style="text-align:right;color:#16a34a">${r.credit>0?r.credit.toFixed(2):''}</span>
+          </div>`).join('')}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.75rem">
+          <div style="display:flex;gap:1.5rem;font-size:13px;color:#888">
+            <span>Débit : <strong style="color:#1a1a1a">${tD.toFixed(2)} €</strong></span>
+            <span>Crédit : <strong style="color:#1a1a1a">${tC.toFixed(2)} €</strong></span>
+          </div>
+          <span class="badge ${eq?'b-ok':'b-err'}">${eq?'✓ Écriture équilibrée':'⚠ Déséquilibre'}</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:1rem">Ajustements manuels</div>
+        <div class="adj-block">
+          ${adj.map((a,i)=>`<div class="adj-row">
+            <input class="adj-inp" type="text" placeholder="Compte" value="${a.compte||''}" oninput="window._adjData['${c.id}'][${i}].compte=this.value;window._rerenderEcr()">
+            <input class="adj-inp" type="text" placeholder="Libellé" value="${a.lib||''}" oninput="window._adjData['${c.id}'][${i}].lib=this.value;window._rerenderEcr()">
+            <input class="adj-inp" type="text" placeholder="Anal." value="${a.anal||''}" oninput="window._adjData['${c.id}'][${i}].anal=this.value;window._rerenderEcr()">
+            <select class="adj-inp" onchange="window._adjToggle('${c.id}',${i},this.value)">
+              <option value="debit" ${(a.debit||0)>0?'selected':''}>Débit</option>
+              <option value="credit" ${(a.credit||0)>0?'selected':''}>Crédit</option>
+            </select>
+            <input class="adj-inp" type="number" placeholder="0,00" value="${(a.debit||0)>0?a.debit:(a.credit||0)>0?a.credit:''}" oninput="window._adjMt('${c.id}',${i},this.value)">
+            <button onclick="window._adjData['${c.id}'].splice(${i},1);window._rerenderEcr()" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:18px">×</button>
+          </div>`).join('')}
+          <button class="add-adj-btn" onclick="window._adjData['${c.id}'].push({compte:'',lib:'',anal:'${cfg.anal||''}',debit:0,credit:0});window._rerenderEcr()">+ Ajouter une ligne manuelle</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:.25rem">
+        <button class="btn-valider${c.statut==='valide'?' devalider':''}" onclick="window.validerCaisse('${c.id}')">${c.statut==='valide'?'Dévalider la caisse':'✓ Valider la caisse'}</button>
+      </div>
+    `;
+
+    window._copierEcr=function(){
+      const rs=buildRows();
+      let txt='Date\tDoss.\tCompte\tAnalytique\tType\tRéf.\tLibellé\tDébit\tCrédit\n';
+      rs.forEach((r,i)=>{
+        const lib=document.getElementById('clib-'+i)?.value||r.lib;
+        txt+=`${dateE}\t55\t${r.compte}\t${r.anal}\tES\t${ref}\t${lib}\t${r.debit>0?r.debit.toFixed(2):''}\t${r.credit>0?r.credit.toFixed(2):''}\n`;
+      });
+      navigator.clipboard.writeText(txt).then(()=>{
+        const b=document.getElementById('btn-copy-ecr');
+        if(b){b.textContent='✓ Copié !';setTimeout(()=>{b.textContent='Copier tout';},2000);}
+      });
+    };
+  }
+
+  window._adjData=adjustments;
+  window._rerenderEcr=render;
+  window._adjToggle=function(cid,i,type){
+    const a=adjustments[cid][i];
+    const v=a.debit||a.credit||0;
+    a.debit=type==='debit'?v:0;a.credit=type==='credit'?v:0;
+    render();
+  };
+  window._adjMt=function(cid,i,val){
+    const a=adjustments[cid][i];const v=parseFloat(val)||0;
+    if(a.credit>0)a.credit=v;else a.debit=v;
+  };
+
+  render();
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+window.saveNote=function(){
+  if(!currentCaisse)return;
+  const v=document.getElementById('note-ctrl')?.value||'';
+  notesCompta[currentCaisse.id]=v;
+  const btn=event.target;
+  btn.textContent='✓ Enregistrée';setTimeout(()=>{btn.textContent='Enregistrer la note';},2000);
+};
+
+window.validerCaisse=async function(id){
+  if(!currentCaisse)return;
+  const newStatut=currentCaisse.statut==='valide'?'en_attente':'valide';
+  await supabase.from('caisses').update({statut:newStatut}).eq('id',id);
+  currentCaisse.statut=newStatut;
+  const inList=caisses.find(x=>x.id===id);
+  if(inList)inList.statut=newStatut;
+  renderKpiGrid();
+  window.switchTab('resume',document.querySelector('.tab:first-child'));
+};
+
+window.doLogout=function(){localStorage.removeItem('falret_user');window.location.href='index.html';};
+
+init();
+</script>
+</body>
+</html>
