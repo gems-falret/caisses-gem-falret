@@ -365,6 +365,7 @@ let USER=null,soldePrecedent=0,caisseCourante=null,moisValide=false;
 let deps=[],parts=[],avances=[];
 let depCount=0,partCount=0,avCount=0,vCount=0;
 let caissesMois={};
+let comptageEnCours=null;
 
 async function init(){
   const stored=localStorage.getItem('falret_user');
@@ -528,6 +529,7 @@ window.fermerCRModifier=async function(moisStr){
 
 async function updateMois(val){
   if(!val)return;
+  comptageEnCours=null;
   const d=new Date(val+'-01');
   const prev=new Date(d.getFullYear(),d.getMonth()-1,1);
   const prevStr=prev.getFullYear()+'-'+(prev.getMonth()+1).toString().padStart(2,'0');
@@ -728,6 +730,14 @@ window.addDepFile=addDepFile;
 
 function removeDepFile(id,fname){const d=deps.find(x=>x.id===id);if(d){d.files=d.files.filter(f=>f.name!==fname);const urls=(d.justificatif_url||'').split(',').filter(u=>u.trim()&&!u.includes(fname));d.justificatif_url=urls.join(',');}renderDepList();}
 window.removeDepFile=removeDepFile;
+window.supprimerJustifDep=async function(id,url){
+  const d=deps.find(x=>x.id===id);if(!d)return;
+  if(!confirm('Supprimer ce justificatif définitivement ?'))return;
+  d.justificatif_url=(d.justificatif_url||'').split(',').filter(u=>u.trim()&&u!==url).join(',');
+  await supabase.storage.from('justificatifs').remove([url]);
+  renderDepList();
+  await sauvegarderBrouillon();
+};
 function depTotal(d){return Math.round(d.ventils.reduce((s,v)=>s+(v.montant||0),0)*100)/100;}
 
 function renderDepList(){
@@ -765,8 +775,8 @@ function renderDepList(){
         </div>`).join('')}
         <button class="add-ventil-btn" onclick="window.ajouterVentil(${d.id})">+ Autre catégorie pour ce ticket</button>
         ${savedUrls.length>0?`<div style="margin-top:8px;padding:8px 10px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#0F6E56;display:flex;align-items:center;flex-wrap:wrap;gap:6px">
-          <span>✅ Justificatif(s) uploadé(s) :</span>
-          ${savedUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}
+          <span>✅ Justificatif(s) :</span>
+          ${savedUrls.map(u=>`<span style="display:inline-flex;align-items:center;gap:2px"><button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button><button onclick="window.supprimerJustifDep(${d.id},'${u}')" style="border:none;background:#fee2e2;color:#dc2626;border-radius:5px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1;margin-left:1px" title="Supprimer">×</button></span>`).join('')}
         </div>`:''}
         <div class="upload-mini" onclick="document.getElementById('fdep${d.id}').click()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
@@ -816,6 +826,14 @@ window.addPartFile=addPartFile;
 
 function removePartFile(id,fname){const p=parts.find(x=>x.id===id);if(p){p.files=p.files.filter(f=>f.name!==fname);const urls=(p.justificatif_url||'').split(',').filter(u=>u.trim()&&!u.includes(fname));p.justificatif_url=urls.join(',');}renderParts();}
 window.removePartFile=removePartFile;
+window.supprimerJustifPart=async function(id,url){
+  const p=parts.find(x=>x.id===id);if(!p)return;
+  if(!confirm('Supprimer ce justificatif définitivement ?'))return;
+  p.justificatif_url=(p.justificatif_url||'').split(',').filter(u=>u.trim()&&u!==url).join(',');
+  await supabase.storage.from('justificatifs').remove([url]);
+  renderParts();
+  await sauvegarderBrouillon();
+};
 
 function renderParts(){
   const el=document.getElementById('part-list');if(!el)return;
@@ -838,10 +856,9 @@ function renderParts(){
           </select>
         </div>
       </div>
-      ${isCotisation?`<div style="margin-bottom:6px;padding:4px 8px;background:#fef9c3;border-radius:6px;font-size:11px;color:#854d0e">Compte comptable : 75600000</div>`:''}
       ${savedUrls.length>0?`<div style="margin-bottom:6px;padding:8px 10px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#0F6E56;display:flex;align-items:center;flex-wrap:wrap;gap:6px">
-        <span>✅ Justificatif(s) uploadé(s) :</span>
-        ${savedUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}
+        <span>✅ Justificatif(s) :</span>
+        ${savedUrls.map(u=>`<span style="display:inline-flex;align-items:center;gap:2px"><button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button><button onclick="window.supprimerJustifPart(${p.id},'${u}')" style="border:none;background:#fee2e2;color:#dc2626;border-radius:5px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1;margin-left:1px" title="Supprimer">×</button></span>`).join('')}
       </div>`:''}
       <div class="upload-mini" onclick="document.getElementById('fpart${p.id}').click()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
@@ -888,7 +905,8 @@ function renderComptage(){
       <input type="number" min="0" step="1" placeholder="0" data-val="${v}" onchange="window.calcComptage()">
       <small id="sp${String(v).replace('.','_')}">= 0 €</small>
     </div>`).join('');
-  if(caisseCourante?.comptage)restaurerComptage(caisseCourante.comptage);
+  if(comptageEnCours)restaurerComptage(comptageEnCours);
+  else if(caisseCourante?.comptage)restaurerComptage(caisseCourante.comptage);
   else if(caisseCourante?.donnees_brouillon?.comptage)restaurerComptage(caisseCourante.donnees_brouillon.comptage);
 }
 
@@ -974,6 +992,14 @@ async function envoyerCaisse(){
   const tp=parts.reduce((s,p)=>s+(p.montant||0),0);
   const ta=avances.reduce((s,a)=>s+(a.montant||0),0);
   const solde=Math.round((soldePrecedent+ta+tp-td)*100)/100;
+  const comptageActuel=sauvegarderComptageData();
+  const snapshotEnvoi={
+    responsable:resp,
+    deps:deps.map(d=>({...d,files:[]})),
+    parts:parts.map(p=>({...p,files:[]})),
+    avances,
+    is_snapshot:true
+  };
   let caisseId=null;
   if(caisseCourante){
     await supabase.from('caisses').update({
@@ -981,7 +1007,7 @@ async function envoyerCaisse(){
       total_depenses:td,total_participations:tp,total_avances:ta,
       solde_cloture:solde,statut:'en_attente',statut_saisie:'envoye',
       statut_justificatifs:deps.every(d=>(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0)?'complets':'incomplets',
-      donnees_brouillon:null,notes:observations
+      donnees_brouillon:snapshotEnvoi,notes:observations,comptage:comptageActuel
     }).eq('id',caisseCourante.id);
     await supabase.from('depenses').delete().eq('caisse_id',caisseCourante.id);
     await supabase.from('participations').delete().eq('caisse_id',caisseCourante.id);
@@ -993,7 +1019,8 @@ async function envoyerCaisse(){
       solde_ouverture:soldePrecedent,total_depenses:td,
       total_participations:tp,total_avances:ta,solde_cloture:solde,
       statut:'en_attente',statut_saisie:'envoye',notes:observations,
-      statut_justificatifs:deps.every(d=>d.files?.length>0)?'complets':'incomplets'
+      statut_justificatifs:deps.every(d=>(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0)?'complets':'incomplets',
+      comptage:comptageActuel,donnees_brouillon:snapshotEnvoi
     }).select().single();
     if(error){btn.disabled=false;btn.textContent='✅ Envoyer à la comptabilité';alert('Erreur : '+error.message);return;}
     caisseId=data.id;
@@ -1036,6 +1063,9 @@ function renderStepBar(active){
 }
 
 function goStep(n){
+  if(document.getElementById('screen-3').style.display!=='none'){
+    comptageEnCours=sauvegarderComptageData();
+  }
   for(let i=1;i<=5;i++)document.getElementById('screen-'+i).style.display='none';
   document.getElementById('screen-'+n).style.display='block';
   renderStepBar(Math.min(n,4));
@@ -1050,7 +1080,7 @@ window.goStep=goStep;
 
 window.retourAccueil=async function(){
   deps=[];parts=[];avances=[];caisseCourante=null;moisValide=false;
-  depCount=0;partCount=0;avCount=0;vCount=0;
+  depCount=0;partCount=0;avCount=0;vCount=0;comptageEnCours=null;
   await chargerFrise();
   const now=new Date();
   const moisVal=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');

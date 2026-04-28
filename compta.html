@@ -402,34 +402,41 @@ window.openDetail=async function(gem){
 
   if(c){
     if(!adjustments[c.id])adjustments[c.id]=[];
-    if(c.statut_saisie==='brouillon'&&c.donnees_brouillon){
+
+    // Toujours interroger les tables en premier
+    const[dr,pr,ar]=await Promise.all([
+      supabase.from('depenses').select('*').eq('caisse_id',c.id),
+      supabase.from('participations').select('*').eq('caisse_id',c.id),
+      supabase.from('avances').select('*').eq('caisse_id',c.id),
+    ]);
+    currentDeps=dr.data||[];
+    currentParts=pr.data||[];
+    currentAvances=ar.data||[];
+
+    // Fallback sur donnees_brouillon si les tables sont vides
+    // (brouillon, snapshot d'envoi, ou politique RLS bloquant la lecture)
+    if(c.donnees_brouillon){
       const db=c.donnees_brouillon;
-      currentAvances=(db.avances||[]).map(a=>({
-        id:a.id,caisse_id:c.id,date_avance:a.date||null,montant:a.montant||0
-      }));
-      currentDeps=(db.deps||[]).map(d=>({
+      const fromSnapshot=d=>({
         id:d.id,caisse_id:c.id,
-        date_depense:d.date||null,
-        fournisseur:d.fournisseur||'',
+        date_depense:d.date||null,fournisseur:d.fournisseur||'',
         categorie:(d.ventils||[]).filter(v=>v.cat).map(v=>v.cat.label).join(', ')||'—',
         compte:(d.ventils||[]).filter(v=>v.cat).map(v=>v.cat.compte).join(', ')||'—',
         montant:(d.ventils||[]).reduce((s,v)=>s+(v.montant||0),0),
         justificatif_url:d.justificatif_url||''
-      }));
-      currentParts=(db.parts||[]).map(p=>({
-        id:p.id,caisse_id:c.id,
-        libelle:p.libelle||'',montant:p.montant||0,
-        type:p.type||'participation',justificatif_url:p.justificatif_url||''
-      }));
-    } else {
-      const[dr,pr,ar]=await Promise.all([
-        supabase.from('depenses').select('*').eq('caisse_id',c.id),
-        supabase.from('participations').select('*').eq('caisse_id',c.id),
-        supabase.from('avances').select('*').eq('caisse_id',c.id),
-      ]);
-      currentDeps=dr.data||[];
-      currentParts=pr.data||[];
-      currentAvances=ar.data||[];
+      });
+      if(!currentDeps.length&&(db.deps||[]).length)
+        currentDeps=(db.deps||[]).map(fromSnapshot);
+      if(!currentParts.length&&(db.parts||[]).length)
+        currentParts=(db.parts||[]).map(p=>({
+          id:p.id,caisse_id:c.id,libelle:p.libelle||'',
+          montant:p.montant||0,type:p.type||'participation',
+          justificatif_url:p.justificatif_url||''
+        }));
+      if(!currentAvances.length&&(db.avances||[]).length)
+        currentAvances=(db.avances||[]).map(a=>({
+          id:a.id,caisse_id:c.id,date_avance:a.date||null,montant:a.montant||0
+        }));
     }
   }
 
@@ -780,6 +787,18 @@ function renderTabEcriture(){
       <div style="display:flex;justify-content:flex-end;margin-top:.25rem">
         <button class="btn-valider${c.statut==='valide'?' devalider':''}" onclick="window.validerCaisse('${c.id}')">${c.statut==='valide'?'Dévalider la caisse':'✓ Valider la caisse'}</button>
       </div>
+      <div class="card" style="margin-top:1rem;border:1.5px dashed #bfdbfe;background:#f0f7ff">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+          <div>
+            <div style="font-size:15px;font-weight:600;color:#1d4ed8;margin-bottom:3px">📥 Justificatifs de la caisse</div>
+            <div style="font-size:12px;color:#555">Fusionne tous les justificatifs (dépenses + participations) en un seul PDF.</div>
+          </div>
+          <button id="btn-dl-justifs" onclick="window.telechargerTousJustifs()" style="background:#1d4ed8;color:white;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;white-space:nowrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Télécharger tous les justificatifs
+          </button>
+        </div>
+      </div>
     `;
 
     window._copierEcr=function(){
@@ -811,6 +830,101 @@ function renderTabEcriture(){
 
   render();
 }
+
+// ── Téléchargement justificatifs ──────────────────────────────────────────────
+
+window.telechargerTousJustifs=async function(){
+  const allPaths=[];
+  currentDeps.forEach(d=>{
+    (d.justificatif_url||'').split(',').filter(u=>u.trim()).forEach(u=>allPaths.push(u));
+  });
+  currentParts.forEach(p=>{
+    (p.justificatif_url||'').split(',').filter(u=>u.trim()).forEach(u=>allPaths.push(u));
+  });
+
+  if(!allPaths.length){
+    alert('Aucun justificatif disponible pour cette caisse.');
+    return;
+  }
+
+  const btn=document.getElementById('btn-dl-justifs');
+  if(!btn)return;
+  const orig=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Génération en cours…';
+
+  // Inject spin animation if not already present
+  if(!document.getElementById('spin-style')){
+    const s=document.createElement('style');
+    s.id='spin-style';s.textContent='@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+    document.head.appendChild(s);
+  }
+
+  try{
+    const {PDFDocument}=await import('https://esm.sh/pdf-lib@1.17.1');
+    const merged=await PDFDocument.create();
+    const W=595,H=842,M=36; // A4 en points
+    let added=0;
+
+    for(const path of allPaths){
+      const {data,error}=await supabase.storage.from('justificatifs').createSignedUrl(path,300);
+      if(error||!data?.signedUrl)continue;
+
+      let resp;
+      try{resp=await fetch(data.signedUrl);}catch{continue;}
+      if(!resp.ok)continue;
+
+      const buf=await resp.arrayBuffer();
+      const lc=path.toLowerCase();
+
+      try{
+        if(lc.endsWith('.pdf')){
+          const donor=await PDFDocument.load(buf,{ignoreEncryption:true});
+          const pages=await merged.copyPages(donor,donor.getPageIndices());
+          pages.forEach(p=>merged.addPage(p));
+          added++;
+        } else {
+          let img;
+          if(lc.match(/\.(jpg|jpeg)$/)){
+            img=await merged.embedJpg(buf);
+          } else if(lc.endsWith('.png')){
+            img=await merged.embedPng(buf);
+          } else {
+            continue;
+          }
+          const {width:iw,height:ih}=img;
+          const sc=Math.min((W-2*M)/iw,(H-2*M)/ih,1);
+          const dw=iw*sc,dh=ih*sc;
+          const pg=merged.addPage([W,H]);
+          pg.drawImage(img,{x:(W-dw)/2,y:(H-dh)/2,width:dw,height:dh});
+          added++;
+        }
+      } catch(e){console.warn('Justificatif ignoré :',path,e);}
+    }
+
+    if(!added){
+      alert('Aucun justificatif n\'a pu être chargé ('+allPaths.length+' tentés).');
+      return;
+    }
+
+    const bytes=await merged.save();
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const mois=document.getElementById('mois-select').value;
+    a.download=`justificatifs_${currentCaisse.gem.replace(/\s+/g,'_')}_${mois}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},60000);
+
+  } catch(e){
+    console.error(e);
+    alert('Erreur lors de la génération du PDF : '+e.message);
+  } finally{
+    btn.disabled=false;
+    btn.innerHTML=orig;
+  }
+};
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
