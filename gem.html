@@ -127,6 +127,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .type-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500;margin-left:4px}
 .type-participation{background:#dbeafe;color:#1d4ed8}
 .type-cotisation{background:#fef9c3;color:#854d0e}
+/* ── Écran accueil ── */
+#screen-accueil{position:relative;z-index:1}
+.accueil-hero{text-align:center;padding:2rem 1rem 1.5rem;color:white}
+.accueil-avatar{width:70px;height:70px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#1649b8;margin:0 auto 1rem;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+.accueil-hero h2{font-size:26px;font-weight:800;margin-bottom:.4rem;text-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.accueil-hero p{font-size:14px;color:rgba(255,255,255,0.75)}
+.accueil-card{background:rgba(255,255,255,0.97);border-radius:20px;padding:2rem;margin-bottom:1.25rem;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.accueil-question{font-size:19px;font-weight:700;color:#1a1a1a;margin-bottom:.4rem;text-align:center}
+.accueil-sub{font-size:13px;color:#888;text-align:center;margin-bottom:1.5rem}
+.frise-big{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:1rem}
+.frise-big-item{border-radius:14px;padding:14px 6px 10px;border:2px solid transparent;cursor:pointer;text-align:center;transition:all .15s;user-select:none}
+.frise-big-item.vide{background:#f5f5f5;border-color:#eee}
+.frise-big-item.brouillon{background:#fef9c3;border-color:#fde047}
+.frise-big-item.envoye{background:#dcfce7;border-color:#86efac}
+.frise-big-item.valide{background:#dbeafe;border-color:#93c5fd}
+.frise-big-item:hover{transform:translateY(-3px);box-shadow:0 6px 16px rgba(0,0,0,0.12)}
+.frise-big-dot{width:12px;height:12px;border-radius:50%;margin:0 auto 6px}
+.frise-big-item.vide .frise-big-dot{background:#ddd}
+.frise-big-item.brouillon .frise-big-dot{background:#f59e0b}
+.frise-big-item.envoye .frise-big-dot{background:#16a34a}
+.frise-big-item.valide .frise-big-dot{background:#3b82f6}
+.frise-big-nom{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:3px}
+.frise-big-item.vide .frise-big-nom{color:#aaa}
+.frise-big-statut{font-size:10px;color:#aaa}
+.frise-big-item.brouillon .frise-big-statut{color:#854d0e}
+.frise-big-item.envoye .frise-big-statut{color:#16a34a}
+.frise-big-item.valide .frise-big-statut{color:#1d4ed8}
+.accueil-legend{display:flex;gap:1rem;justify-content:center;font-size:11px;color:#888;flex-wrap:wrap;margin-top:.25rem}
 </style>
 </head>
 <body>
@@ -198,26 +226,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <div class="container">
-  <div class="gem-badge">
-    <div class="gem-avatar" id="gem-initiales">--</div>
-    <div class="gem-info">
-      <h2 id="gem-nom">Chargement...</h2>
-      <p id="gem-dossier">Dossier --</p>
+
+  <!-- ── Écran accueil ── -->
+  <div id="screen-accueil">
+    <div class="accueil-hero">
+      <div class="accueil-avatar" id="gem-initiales-acc">--</div>
+      <h2 id="gem-nom-acc">GEM --</h2>
+      <p id="gem-dossier-acc">Dossier --</p>
+    </div>
+    <div class="accueil-card">
+      <p class="accueil-question">Quelle caisse souhaitez-vous saisir ?</p>
+      <p class="accueil-sub">Cliquez sur le mois de votre choix</p>
+      <div class="frise-big" id="frise-big-mois"></div>
+      <div class="accueil-legend">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ddd;margin-right:5px;vertical-align:middle"></span>Non commencé</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:5px;vertical-align:middle"></span>Brouillon</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;margin-right:5px;vertical-align:middle"></span>Envoyé</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6;margin-right:5px;vertical-align:middle"></span>Validé</span>
+      </div>
     </div>
   </div>
 
-  <div class="frise">
-    <div class="frise-title">Suivi de l'année 2026 — clique sur un mois pour le voir</div>
-    <div class="frise-mois" id="frise-mois"></div>
-    <div style="display:flex;gap:1rem;margin-top:.75rem;font-size:11px;color:#888;flex-wrap:wrap">
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ddd;margin-right:4px"></span>Non commencé</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px"></span>Brouillon</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:4px"></span>Envoyé</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;margin-right:4px"></span>Validé</span>
+  <!-- ── Zone formulaire (cachée par défaut) ── -->
+  <div id="screen-form" style="display:none">
+    <div class="gem-badge">
+      <div class="gem-avatar" id="gem-initiales">--</div>
+      <div class="gem-info">
+        <h2 id="gem-nom">Chargement...</h2>
+        <p id="gem-dossier">Dossier --</p>
+      </div>
     </div>
-  </div>
-
-  <div class="step-bar" id="step-bar"></div>
+    <div class="frise">
+      <div class="frise-title">Suivi de l'année 2026 — clique sur un mois</div>
+      <div class="frise-mois" id="frise-mois"></div>
+      <div style="display:flex;gap:1rem;margin-top:.75rem;font-size:11px;color:#888;flex-wrap:wrap">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ddd;margin-right:4px"></span>Non commencé</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px"></span>Brouillon</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:4px"></span>Envoyé</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;margin-right:4px"></span>Validé</span>
+      </div>
+    </div>
+    <div class="step-bar" id="step-bar"></div>
 
   <div id="screen-1">
     <div class="card">
@@ -328,6 +377,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn btn-primary" onclick="window.retourAccueil()">Retour à l'accueil</button>
     </div>
   </div>
+
+  </div><!-- fin screen-form -->
 </div>
 
 <div class="modal-overlay" id="modal-cr">
@@ -373,17 +424,34 @@ async function init(){
   USER=JSON.parse(stored);
   if(USER.role!=='gem'){window.location.href='index.html';return;}
   document.getElementById('user-email').textContent=USER.gem;
+  // Accueil
+  const initiales=USER.gem.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('gem-initiales-acc').textContent=initiales;
+  document.getElementById('gem-nom-acc').textContent='Bonjour, GEM '+USER.gem+' 👋';
+  document.getElementById('gem-dossier-acc').textContent='Dossier '+USER.dossier;
+  // Form (en arrière-plan)
   document.getElementById('gem-nom').textContent='GEM '+USER.gem;
   document.getElementById('gem-dossier').textContent='Dossier '+USER.dossier;
-  document.getElementById('gem-initiales').textContent=USER.gem.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('gem-initiales').textContent=initiales;
   await chargerFrise();
+  renderFriseAccueil();
+}
+
+function renderFriseAccueil(){
   const now=new Date();
-  const moisVal=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
-  document.getElementById('mois').value=moisVal;
-  await updateMois(moisVal);
-  renderStepBar(1);
-  renderAvances();
-  renderParts();
+  const annee=now.getFullYear();
+  const el=document.getElementById('frise-big-mois');
+  if(!el)return;
+  const statutLabel={vide:'Non commencé',brouillon:'Brouillon',envoye:'Envoyé',valide:'Validé'};
+  el.innerHTML=MOIS_LONGS.map((nom,i)=>{
+    const moisStr=`${annee}-${String(i+1).padStart(2,'0')}`;
+    const statut=caissesMois[moisStr]||'vide';
+    return`<div class="frise-big-item ${statut}" onclick="window.clicFrise('${moisStr}')">
+      <div class="frise-big-dot"></div>
+      <div class="frise-big-nom">${nom}</div>
+      <div class="frise-big-statut">${statutLabel[statut]}</div>
+    </div>`;
+  }).join('');
 }
 
 async function chargerFrise(){
@@ -394,6 +462,7 @@ async function chargerFrise(){
     else caissesMois[c.mois]=c.statut_saisie||'envoye';
   });
   renderFrise();
+  renderFriseAccueil();
 }
 
 function renderFrise(){
@@ -416,6 +485,9 @@ window.clicFrise=async function(moisStr){
   if(statut==='envoye'||statut==='valide'){
     await ouvrirCompteRendu(moisStr);
   } else {
+    // Passer en mode formulaire
+    document.getElementById('screen-accueil').style.display='none';
+    document.getElementById('screen-form').style.display='block';
     document.getElementById('mois').value=moisStr;
     await updateMois(moisStr);
     renderFrise();
@@ -1123,11 +1195,9 @@ window.retourAccueil=async function(){
   deps=[];parts=[];avances=[];caisseCourante=null;moisValide=false;
   depCount=0;partCount=0;avCount=0;vCount=0;comptageEnCours=null;
   await chargerFrise();
-  const now=new Date();
-  const moisVal=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
-  document.getElementById('mois').value=moisVal;
-  await updateMois(moisVal);
-  goStep(1);
+  renderFriseAccueil();
+  document.getElementById('screen-form').style.display='none';
+  document.getElementById('screen-accueil').style.display='block';
 };
 
 window.doLogout=function(){localStorage.removeItem('falret_user');window.location.href='index.html';};
