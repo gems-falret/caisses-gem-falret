@@ -426,6 +426,7 @@ window.cycleJustif=cycleJustif;
 // ── Vue détail ────────────────────────────────────────────────────────────────
 
 window.openDetail=async function(gem){
+  try{
   const c=caisses.find(x=>x.gem===gem);
   currentCaisse=c||null;
   currentDeps=[];currentParts=[];currentAvances=[];
@@ -488,6 +489,10 @@ window.openDetail=async function(gem){
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-resume').classList.add('active');
   renderTabResume();
+  }catch(e){
+    console.error('openDetail error:',e);
+    alert('Erreur ouverture caisse : '+e.message);
+  }
 };
 
 window.backToList=function(){
