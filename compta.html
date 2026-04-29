@@ -445,8 +445,8 @@ window.openDetail=async function(gem){
 
     // Fallback sur donnees_brouillon si les tables sont vides
     // (brouillon, snapshot d'envoi, ou politique RLS bloquant la lecture)
-    if(c.donnees_brouillon){
-      const db=c.donnees_brouillon;
+    const db=c.donnees_brouillon;
+    if(db){
       const fromSnapshot=d=>({
         id:d.id,caisse_id:c.id,
         date_depense:d.date||null,fournisseur:d.fournisseur||'',
