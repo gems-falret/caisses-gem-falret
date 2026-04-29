@@ -703,52 +703,46 @@ function chargerDonnees(c){
 
 async function chargerDepuisSupabase(c){
   document.getElementById('responsable').value=c.responsable||'';
-  const{data:ddeps}=await supabase.from('depenses').select('*').eq('caisse_id',c.id);
-  const{data:pparts}=await supabase.from('participations').select('*').eq('caisse_id',c.id);
-  const{data:aavances}=await supabase.from('avances').select('*').eq('caisse_id',c.id);
-  const db=c.donnees_brouillon; // snapshot sauvegardé à l'envoi
+  const db=c.donnees_brouillon;
 
-  // Dépenses — restaurer les ventils depuis le snapshot pour conserver
-  // les catégories multiples et leurs montants individuels
-  if(ddeps&&ddeps.length){
-    deps=(ddeps).map((d,i)=>{
-      const sd=db?.deps?.find(s=>s.fournisseur===d.fournisseur&&s.date===(d.date_depense||''))||db?.deps?.[i];
-      let ventils;
-      if(sd?.ventils?.length>0){
-        ventils=sd.ventils.map((v,vi)=>({
-          id:(i+1)*100+vi,
-          cat:v.cat?CATS.find(cc=>cc.label===v.cat.label)||v.cat:null,
-          montant:v.montant||0
-        }));
-      } else {
-        const cats=(d.categorie||'').split(', ');
-        ventils=cats.map((label,vi)=>({
-          id:(i+1)*100+vi,
-          cat:CATS.find(cc=>cc.label===label)||{label,compte:'Autres',icon:'📦'},
-          montant:vi===0?d.montant||0:0
-        }));
-      }
+  // Priorité absolue au snapshot : il contient les ventils exacts et ne peut pas
+  // avoir de doublons (contrairement aux tables qui peuvent avoir des doublons RLS).
+  if(db&&(db.deps?.length||db.parts?.length||db.avances?.length)){
+    deps=(db.deps||[]).map(d=>({
+      ...d,files:[],
+      ventils:(d.ventils||[]).map(v=>({...v,cat:v.cat?CATS.find(cc=>cc.label===v.cat.label)||v.cat:null}))
+    }));
+    parts=(db.parts||[]).map(p=>({...p,files:[]}));
+    avances=(db.avances||[]).map(a=>({...a}));
+  } else {
+    // Pas de snapshot (ancienne caisse) : lire les tables
+    const{data:ddeps}=await supabase.from('depenses').select('*').eq('caisse_id',c.id);
+    const{data:pparts}=await supabase.from('participations').select('*').eq('caisse_id',c.id);
+    const{data:aavances}=await supabase.from('avances').select('*').eq('caisse_id',c.id);
+    // Dédoublonnage par fournisseur+date pour corriger d'éventuels doublons en base
+    const seen=new Set();
+    deps=((ddeps||[]).filter(d=>{
+      const k=(d.fournisseur||'')+'|'+(d.date_depense||'')+'|'+d.montant;
+      if(seen.has(k))return false;seen.add(k);return true;
+    })).map((d,i)=>{
+      const cats=(d.categorie||'').split(', ').filter(Boolean);
+      const ventils=cats.map((label,vi)=>({
+        id:(i+1)*100+vi,
+        cat:CATS.find(cc=>cc.label===label)||{label,compte:'Autres',icon:'📦'},
+        montant:vi===0?d.montant||0:0
+      }));
       return{id:i+1,date:d.date_depense||'',fournisseur:d.fournisseur||'',ventils,files:[],justificatif_url:d.justificatif_url||''};
     });
-  } else if(db?.deps?.length){
-    deps=(db.deps).map(d=>({...d,files:[]}));
-  } else {deps=[];}
+    parts=((pparts||[]).filter((p,i,a)=>a.findIndex(x=>x.libelle===p.libelle&&x.montant===p.montant)===i))
+      .map((p,i)=>({id:i+1,libelle:p.libelle||'',montant:p.montant||0,type:p.type||'participation',files:[],justificatif_url:p.justificatif_url||''}));
+    avances=((aavances||[]).filter((a,i,arr)=>arr.findIndex(x=>x.date_avance===a.date_avance&&x.montant===a.montant)===i))
+      .map((a,i)=>({id:i+1,date:a.date_avance||'',montant:a.montant||0}));
+  }
 
-  // Participations — fallback snapshot si table vide
-  if(pparts&&pparts.length){
-    parts=(pparts).map((p,i)=>({id:i+1,libelle:p.libelle||'',montant:p.montant||0,type:p.type||'participation',files:[],justificatif_url:p.justificatif_url||''}));
-  } else if(db?.parts?.length){
-    parts=(db.parts).map(p=>({...p,files:[]}));
-  } else {parts=[];}
-
-  // Avances — fallback snapshot si table vide
-  if(aavances&&aavances.length){
-    avances=(aavances).map((a,i)=>({id:i+1,date:a.date_avance||'',montant:a.montant||0}));
-  } else if(db?.avances?.length){
-    avances=(db.avances).map(a=>({...a}));
-  } else {avances=[];}
-
-  depCount=deps.length;partCount=parts.length;avCount=avances.length;vCount=deps.length;
+  depCount=deps.reduce((m,d)=>Math.max(m,d.id||0),0);
+  partCount=parts.reduce((m,p)=>Math.max(m,p.id||0),0);
+  avCount=avances.reduce((m,a)=>Math.max(m,a.id||0),0);
+  vCount=deps.reduce((m,d)=>d.ventils?d.ventils.reduce((mv,v)=>Math.max(mv,v.id||0),m):m,0);
   renderAvances();updateTotaux();
   setTimeout(()=>goStep(2),100);
 }

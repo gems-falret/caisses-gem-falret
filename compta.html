@@ -787,11 +787,15 @@ function renderTabEcriture(){
     const rows=[];
     const grouped={};
     currentDeps.forEach(d=>{
-      const comptes=d.compte?d.compte.split(', '):['Autres'];
-      const cats=d.categorie?d.categorie.split(', '):['DIVERS'];
-      comptes.forEach((compte,i)=>{
-        if(!grouped[compte])grouped[compte]={compte,lib:(cats[i]||cats[0]||'DIVERS').toUpperCase(),montant:0};
-        grouped[compte].montant+=d.montant/comptes.length;
+      const ventils=d.ventils?.length>0?d.ventils:null;
+      const cats=d.categorie?d.categorie.split(', ').filter(Boolean):['DIVERS'];
+      const comptes=d.compte?d.compte.split(', ').filter(Boolean):['Autres'];
+      cats.forEach((cat,i)=>{
+        const compte=comptes[i]||comptes[0]||'Autres';
+        // Montant exact depuis ventils si disponible, sinon division égale
+        const montant=ventils?(ventils[i]?.montant||0):(d.montant/cats.length);
+        if(!grouped[compte])grouped[compte]={compte,lib:cat.toUpperCase(),montant:0};
+        grouped[compte].montant+=montant;
       });
     });
     Object.values(grouped).forEach(g=>rows.push({compte:g.compte,anal:cfg.anal||'',lib:g.lib,debit:Math.round(g.montant*100)/100,credit:0,adj:false}));
