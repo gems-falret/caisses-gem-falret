@@ -510,10 +510,14 @@ function renderKpiGrid(){
   const ecart=tc!==null?Math.round((tc-c.solde_cloture)*100)/100:null;
   const ecartColor=ecart===null?'#888':Math.abs(ecart)<0.01?'#16a34a':ecart>0?'#854d0e':'#dc2626';
   const ecartText=ecart===null?'—':Math.abs(ecart)<0.01?'✓ Conforme':ecart>0?'+'+fmt(ecart)+' €':fmt(ecart)+' €';
+  const tPart=currentParts.filter(p=>!p.type||p.type==='participation').reduce((s,p)=>s+(p.montant||0),0);
+  const tCotis=currentParts.filter(p=>p.type==='cotisation').reduce((s,p)=>s+(p.montant||0),0);
   document.getElementById('kpi-grid').innerHTML=`
     <div class="kpi"><div class="kpi-label">Solde ouverture</div><div class="kpi-val">${fmt(c.solde_ouverture)} €</div></div>
     <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Avances reçues</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
     <div class="kpi" style="border-color:#fecaca"><div class="kpi-label">Total dépenses</div><div class="kpi-val" style="color:#dc2626">-${fmt(c.total_depenses)} €</div></div>
+    <div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations</div><div class="kpi-val" style="color:#059669">+${fmt(tPart)} €</div></div>
+    <div class="kpi" style="border-color:#fbbf24"><div class="kpi-label">Cotisations</div><div class="kpi-val" style="color:#d97706">+${fmt(tCotis)} €</div></div>
     <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde théorique</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
     <div class="kpi" style="border-color:#e5e7eb"><div class="kpi-label">Comptage caisse</div><div class="kpi-val" style="color:#1a1a1a">${tc!==null?fmt(tc)+' €':'—'}</div></div>
     <div class="kpi" style="border-color:${ecartColor};background:${ecart!==null&&Math.abs(ecart)<0.01?'#f0fdf4':ecart!==null&&ecart>0?'#fefce8':ecart!==null?'#fff5f5':'white'}">
@@ -521,7 +525,7 @@ function renderKpiGrid(){
       <div class="kpi-val" style="color:${ecartColor};font-size:15px">${ecartText}</div>
     </div>
   `;
-  document.getElementById('kpi-grid').style.gridTemplateColumns='repeat(6,1fr)';
+  document.getElementById('kpi-grid').style.gridTemplateColumns='repeat(8,1fr)';
 }
 
 window.switchTab=function(name,el){
