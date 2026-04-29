@@ -84,8 +84,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .dep-meta-item span{font-size:13px;color:#1a1a1a}
 
 /* Part/cotis cards */
-.part-card{background:white;border:1px solid #9FE1CB;border-radius:12px;padding:1rem;margin-bottom:.75rem}
-.cotis-card{background:white;border:1px solid #fde047;border-radius:12px;padding:1rem;margin-bottom:.75rem}
+.part-card{background:white;border:1.5px solid #6ee7b7;border-radius:12px;overflow:hidden;margin-bottom:.75rem}
+.part-card-header{display:flex;align-items:center;gap:10px;padding:.75rem 1rem;background:#d1fae5;border-bottom:1.5px solid #6ee7b7}
+.part-num{width:24px;height:24px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0}
+.part-card-body{padding:1rem}
+.cotis-card{background:white;border:1.5px solid #fbbf24;border-radius:12px;overflow:hidden;margin-bottom:.75rem}
+.cotis-card-header{display:flex;align-items:center;gap:10px;padding:.75rem 1rem;background:#fef3c7;border-bottom:1.5px solid #fbbf24}
+.cotis-num{width:24px;height:24px;border-radius:50%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0}
 
 /* Justif */
 .justif-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 8px;border-radius:6px;cursor:pointer;border:none;margin:2px;font-family:inherit}
@@ -227,7 +232,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="table-wrap">
     <table class="tbl">
       <thead><tr>
-        <th>GEM</th><th>Dossier</th><th>Avances</th><th>Dépenses</th><th>Participations</th><th>Solde clôture</th><th>Justificatifs</th><th>Statut</th><th></th>
+        <th>GEM</th><th>Dossier</th><th>Avances</th><th>Dépenses</th><th>Participations</th><th>Solde théorique</th><th>Comptage</th><th>Écart</th><th>Justificatifs</th><th>Statut</th><th></th>
       </tr></thead>
       <tbody id="tbody"></tbody>
     </table>
@@ -331,10 +336,19 @@ function initMoisSelect(){
 
 // ── Vue liste ─────────────────────────────────────────────────────────────────
 
+function totalComptage(c){
+  if(!c||!c.comptage)return null;
+  let t=0;
+  if(c.comptage.billets)BILLETS.forEach(v=>{t+=v*(c.comptage.billets[String(v)]||0);});
+  if(c.comptage.pieces)PIECES.forEach(v=>{t=Math.round((t+v*(c.comptage.pieces[String(v)]||0))*100)/100;});
+  return Math.round(t*100)/100;
+}
+
 async function loadCaisses(){
   const mois=document.getElementById('mois-select').value;
   const{data}=await supabase.from('caisses').select('*').eq('mois',mois).order('gem');
-  caisses=data||[];
+  // Ne montrer que les caisses envoyées/validées — les brouillons restent privés au GEM
+  caisses=(data||[]).filter(c=>c.statut_saisie!=='brouillon');
   renderTable();
   updateMetrics();
 }
@@ -369,6 +383,12 @@ function renderTable(){
       const justifLabel={complets:'Complets',incomplets:'Incomplets',manquant:'Manquants'};
       const justifClass={complets:'ok',incomplets:'warn',manquant:'err'};
       const justifBtn=c?`<button class="jt-btn ${justifClass[justif]||''}" onclick="window.cycleJustif('${c.id}','${justif}',event)">${justifLabel[justif]||justif}</button>`:'<span style="color:#ccc">—</span>';
+      const tc=c?totalComptage(c):null;
+      const ecart=tc!==null&&c?Math.round((tc-c.solde_cloture)*100)/100:null;
+      const ecartCell=ecart===null?'<span style="color:#ccc">—</span>':
+        Math.abs(ecart)<0.01?'<span class="badge b-ok">✓ Conforme</span>':
+        ecart>0?`<span class="badge b-warn">+${fmt(ecart)} €</span>`:
+        `<span class="badge b-err">${fmt(ecart)} €</span>`;
       rows+=`<tr onclick="window.openDetail('${gem}')">
         <td style="font-weight:600">${gem}</td>
         <td><span class="badge b-wait" style="font-size:10px">${cfg.anal}</span></td>
@@ -376,13 +396,15 @@ function renderTable(){
         <td style="color:#dc2626">${c?'-'+fmt(c.total_depenses)+' €':'—'}</td>
         <td style="color:#16a34a">${c?'+'+fmt(c.total_participations)+' €':'—'}</td>
         <td style="font-weight:600">${c?fmt(c.solde_cloture)+' €':'—'}</td>
+        <td style="font-weight:600">${tc!==null?fmt(tc)+' €':'<span style="color:#ccc">—</span>'}</td>
+        <td>${ecartCell}</td>
         <td onclick="event.stopPropagation()">${justifBtn}</td>
         <td>${statutBadge}</td>
         <td onclick="event.stopPropagation()"><button class="jt-btn" onclick="window.openDetail('${gem}')">Ouvrir →</button></td>
       </tr>`;
     }
   });
-  tbody.innerHTML=rows||'<tr><td colspan="9" style="text-align:center;color:#aaa;padding:2rem">Aucun résultat</td></tr>';
+  tbody.innerHTML=rows||'<tr><td colspan="11" style="text-align:center;color:#aaa;padding:2rem">Aucun résultat</td></tr>';
 }
 
 async function cycleJustif(id,current,e){
@@ -465,13 +487,22 @@ window.backToList=function(){
 function renderKpiGrid(){
   const c=currentCaisse;
   if(!c){document.getElementById('kpi-grid').innerHTML='';return;}
+  const tc=totalComptage(c);
+  const ecart=tc!==null?Math.round((tc-c.solde_cloture)*100)/100:null;
+  const ecartColor=ecart===null?'#888':Math.abs(ecart)<0.01?'#16a34a':ecart>0?'#854d0e':'#dc2626';
+  const ecartText=ecart===null?'—':Math.abs(ecart)<0.01?'✓ Conforme':ecart>0?'+'+fmt(ecart)+' €':fmt(ecart)+' €';
   document.getElementById('kpi-grid').innerHTML=`
     <div class="kpi"><div class="kpi-label">Solde ouverture</div><div class="kpi-val">${fmt(c.solde_ouverture)} €</div></div>
     <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Avances reçues</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
     <div class="kpi" style="border-color:#fecaca"><div class="kpi-label">Total dépenses</div><div class="kpi-val" style="color:#dc2626">-${fmt(c.total_depenses)} €</div></div>
-    <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Participations</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_participations)} €</div></div>
-    <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde clôture</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
+    <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde théorique</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
+    <div class="kpi" style="border-color:#e5e7eb"><div class="kpi-label">Comptage caisse</div><div class="kpi-val" style="color:#1a1a1a">${tc!==null?fmt(tc)+' €':'—'}</div></div>
+    <div class="kpi" style="border-color:${ecartColor};background:${ecart!==null&&Math.abs(ecart)<0.01?'#f0fdf4':ecart!==null&&ecart>0?'#fefce8':ecart!==null?'#fff5f5':'white'}">
+      <div class="kpi-label">Écart</div>
+      <div class="kpi-val" style="color:${ecartColor};font-size:15px">${ecartText}</div>
+    </div>
   `;
+  document.getElementById('kpi-grid').style.gridTemplateColumns='repeat(6,1fr)';
 }
 
 window.switchTab=function(name,el){
@@ -602,33 +633,49 @@ function renderTabParticipations(){
   const tPart=participations.reduce((s,p)=>s+(p.montant||0),0);
   const tCotis=cotisations.reduce((s,p)=>s+(p.montant||0),0);
 
-  const card=(p,isCotis)=>{
+  const cardPart=(p,idx)=>{
     const urls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
-    return`<div class="${isCotis?'cotis-card':'part-card'}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div>
-          <div style="font-size:14px;font-weight:600">${p.libelle||'—'}</div>
-          <div style="font-size:11px;color:#888;margin-top:2px">Compte : ${isCotis?'75600000':'70820000'}</div>
-        </div>
-        <span style="font-size:15px;font-weight:700;color:#16a34a">+${fmt(p.montant)} €</span>
+    return`<div class="part-card">
+      <div class="part-card-header">
+        <div class="part-num">${idx}</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#065f46">${p.libelle||'—'}</div>
+        <div style="font-size:11px;color:#047857;margin-top:1px">Compte 70820000 — Participation adhérent</div></div>
+        <span style="font-size:15px;font-weight:700;color:#059669">+${fmt(p.montant)} €</span>
       </div>
-      ${urls.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${urls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}</div>`:`<span class="no-justif">❌ Pas de justificatif</span>`}
+      <div class="part-card-body">
+        ${urls.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px">${urls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}</div>`:`<span class="no-justif">❌ Pas de justificatif</span>`}
+      </div>
     </div>`;
   };
 
-  let html='<div style="border-left:3px solid #1D9E75;background:#E1F5EE;border-radius:0 14px 14px 0;padding:1.25rem">';
+  const cardCotis=(p,idx)=>{
+    const urls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
+    return`<div class="cotis-card">
+      <div class="cotis-card-header">
+        <div class="cotis-num">${idx}</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#92400e">${p.libelle||'—'}</div>
+        <div style="font-size:11px;color:#b45309;margin-top:1px">Compte 75600000 — Cotisation adhérent</div></div>
+        <span style="font-size:15px;font-weight:700;color:#d97706">+${fmt(p.montant)} €</span>
+      </div>
+      <div class="part-card-body">
+        ${urls.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px">${urls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}</div>`:`<span class="no-justif">❌ Pas de justificatif</span>`}
+      </div>
+    </div>`;
+  };
+
+  let html='<div style="padding:.25rem">';
   if(participations.length){
-    html+=`<div style="font-size:11px;font-weight:600;color:#0F6E56;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem">Participations adhérents (${participations.length})</div>`;
-    html+=participations.map(p=>card(p,false)).join('');
-    html+=`<div class="total-row" style="background:#d1fae5;margin-bottom:${cotisations.length?'1.25rem':'.25rem'}"><span>Total participations</span><span style="color:#16a34a">+${fmt(tPart)} €</span></div>`;
+    html+=`<div style="font-size:11px;font-weight:700;color:#059669;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.75rem;display:flex;align-items:center;gap:8px"><span style="width:28px;height:2px;background:#6ee7b7;display:inline-block"></span>Participations adhérents (${participations.length})</div>`;
+    html+=participations.map((p,i)=>cardPart(p,i+1)).join('');
+    html+=`<div class="total-row" style="background:#d1fae5;margin-bottom:${cotisations.length?'1.5rem':'.25rem'}"><span>Total participations</span><span style="color:#059669;font-weight:700">+${fmt(tPart)} €</span></div>`;
   }
   if(cotisations.length){
-    html+=`<div style="font-size:11px;font-weight:600;color:#854d0e;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.75rem">Cotisations adhérents (${cotisations.length})</div>`;
-    html+=cotisations.map(p=>card(p,true)).join('');
-    html+=`<div class="total-row" style="background:#fef9c3"><span>Total cotisations</span><span style="color:#854d0e">+${fmt(tCotis)} €</span></div>`;
+    html+=`<div style="font-size:11px;font-weight:700;color:#d97706;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.75rem;display:flex;align-items:center;gap:8px"><span style="width:28px;height:2px;background:#fbbf24;display:inline-block"></span>Cotisations adhérents (${cotisations.length})</div>`;
+    html+=cotisations.map((p,i)=>cardCotis(p,i+1)).join('');
+    html+=`<div class="total-row" style="background:#fef3c7"><span>Total cotisations</span><span style="color:#d97706;font-weight:700">+${fmt(tCotis)} €</span></div>`;
   }
   if(participations.length&&cotisations.length){
-    html+=`<div class="total-row" style="background:#d1fae5;margin-top:.75rem;font-size:15px"><span>Total général</span><span style="color:#16a34a">+${fmt(tPart+tCotis)} €</span></div>`;
+    html+=`<div class="total-row" style="background:#f0fdf4;margin-top:.75rem;font-size:15px;border:1px solid #6ee7b7"><span style="font-size:15px">Total général participations + cotisations</span><span style="color:#059669;font-size:16px;font-weight:700">+${fmt(tPart+tCotis)} €</span></div>`;
   }
   html+='</div>';
   el.innerHTML=html;
