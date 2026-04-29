@@ -1116,6 +1116,7 @@ async function uploadFiles(files,prefix){
 async function envoyerCaisse(){
   const btn=document.getElementById('btn-envoyer');
   btn.disabled=true;btn.textContent='Envoi en cours...';
+  const resetBtn=()=>{btn.disabled=false;btn.textContent='✅ Envoyer à la comptabilité';};
   const mois=document.getElementById('mois').value;
   const resp=document.getElementById('responsable').value;
   const observations=document.getElementById('observations')?.value||'';
@@ -1132,56 +1133,62 @@ async function envoyerCaisse(){
     is_snapshot:true
   };
   let caisseId=null;
-  if(caisseCourante){
-    await supabase.from('caisses').update({
-      responsable:resp,solde_ouverture:soldePrecedent,
-      total_depenses:td,total_participations:tp,total_avances:ta,
-      solde_cloture:solde,statut:'en_attente',statut_saisie:'envoye',
-      statut_justificatifs:deps.every(d=>(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0)?'complets':'incomplets',
-      donnees_brouillon:snapshotEnvoi,notes:observations,comptage:comptageActuel
-    }).eq('id',caisseCourante.id);
-    await supabase.from('depenses').delete().eq('caisse_id',caisseCourante.id);
-    await supabase.from('participations').delete().eq('caisse_id',caisseCourante.id);
-    await supabase.from('avances').delete().eq('caisse_id',caisseCourante.id);
-    caisseId=caisseCourante.id;
-  } else {
-    const{data,error}=await supabase.from('caisses').insert({
-      gem:USER.gem,dossier:USER.dossier,mois,responsable:resp,
-      solde_ouverture:soldePrecedent,total_depenses:td,
-      total_participations:tp,total_avances:ta,solde_cloture:solde,
-      statut:'en_attente',statut_saisie:'envoye',notes:observations,
-      statut_justificatifs:deps.every(d=>(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0)?'complets':'incomplets',
-      comptage:comptageActuel,donnees_brouillon:snapshotEnvoi
-    }).select().single();
-    if(error){btn.disabled=false;btn.textContent='✅ Envoyer à la comptabilité';alert('Erreur : '+error.message);return;}
-    caisseId=data.id;
+  try{
+    if(caisseCourante){
+      const{error:upErr}=await supabase.from('caisses').update({
+        responsable:resp,solde_ouverture:soldePrecedent,
+        total_depenses:td,total_participations:tp,total_avances:ta,
+        solde_cloture:solde,statut:'en_attente',statut_saisie:'envoye',
+        statut_justificatifs:deps.every(d=>(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0)?'complets':'incomplets',
+        donnees_brouillon:snapshotEnvoi,notes:observations,comptage:comptageActuel
+      }).eq('id',caisseCourante.id);
+      if(upErr)throw upErr;
+      await supabase.from('depenses').delete().eq('caisse_id',caisseCourante.id);
+      await supabase.from('participations').delete().eq('caisse_id',caisseCourante.id);
+      await supabase.from('avances').delete().eq('caisse_id',caisseCourante.id);
+      caisseId=caisseCourante.id;
+    } else {
+      const{data,error}=await supabase.from('caisses').insert({
+        gem:USER.gem,dossier:USER.dossier,mois,responsable:resp,
+        solde_ouverture:soldePrecedent,total_depenses:td,
+        total_participations:tp,total_avances:ta,solde_cloture:solde,
+        statut:'en_attente',statut_saisie:'envoye',notes:observations,
+        statut_justificatifs:deps.every(d=>(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0)?'complets':'incomplets',
+        comptage:comptageActuel,donnees_brouillon:snapshotEnvoi
+      }).select().single();
+      if(error)throw error;
+      caisseId=data.id;
+    }
+    for(const d of deps){
+      const newUrls=await uploadFiles(d.files||[],`${USER.gem}/${mois}/depenses`);
+      const existingUrls=(d.justificatif_url||'').split(',').filter(u=>u.trim());
+      const allUrls=[...existingUrls,...newUrls];
+      await supabase.from('depenses').insert({
+        caisse_id:caisseId,date_depense:d.date||null,fournisseur:d.fournisseur,
+        categorie:d.ventils.map(v=>v.cat?v.cat.label:'—').join(', '),
+        compte:d.ventils.map(v=>v.cat?v.cat.compte:'—').join(', '),
+        montant:depTotal(d),justificatif_url:allUrls.join(',')
+      });
+    }
+    for(const p of parts){
+      const newUrls=await uploadFiles(p.files||[],`${USER.gem}/${mois}/participations`);
+      const existingUrls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
+      const allUrls=[...existingUrls,...newUrls];
+      await supabase.from('participations').insert({
+        caisse_id:caisseId,libelle:p.libelle,montant:p.montant||0,
+        type:p.type||'participation',justificatif_url:allUrls.join(',')
+      });
+    }
+    for(const a of avances){
+      await supabase.from('avances').insert({caisse_id:caisseId,date_avance:a.date||null,montant:a.montant||0});
+    }
+    await chargerFrise();
+    goStep(5);
+  } catch(e){
+    console.error('Erreur envoi caisse:',e);
+    resetBtn();
+    alert('Erreur lors de l\'envoi : '+(e.message||'veuillez réessayer.'));
   }
-  for(const d of deps){
-    const newUrls=await uploadFiles(d.files||[],`${USER.gem}/${mois}/depenses`);
-    const existingUrls=(d.justificatif_url||'').split(',').filter(u=>u.trim());
-    const allUrls=[...existingUrls,...newUrls];
-    await supabase.from('depenses').insert({
-      caisse_id:caisseId,date_depense:d.date||null,fournisseur:d.fournisseur,
-      categorie:d.ventils.map(v=>v.cat?v.cat.label:'—').join(', '),
-      compte:d.ventils.map(v=>v.cat?v.cat.compte:'—').join(', '),
-      montant:depTotal(d),justificatif_url:allUrls.join(',')
-    });
-  }
-  for(const p of parts){
-    const newUrls=await uploadFiles(p.files||[],`${USER.gem}/${mois}/participations`);
-    const existingUrls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
-    const allUrls=[...existingUrls,...newUrls];
-    await supabase.from('participations').insert({
-      caisse_id:caisseId,libelle:p.libelle,montant:p.montant||0,
-      type:p.type||'participation',
-      justificatif_url:allUrls.join(',')
-    });
-  }
-  for(const a of avances){
-    await supabase.from('avances').insert({caisse_id:caisseId,date_avance:a.date||null,montant:a.montant||0});
-  }
-  await chargerFrise();
-  goStep(5);
 }
 window.envoyerCaisse=envoyerCaisse;
 
