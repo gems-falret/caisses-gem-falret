@@ -773,7 +773,7 @@ function restaurerComptage(comptageData){
   calcComptage();
 }
 
-function ajouterAvance(){avCount++;avances.push({id:avCount,date:'',montant:0});renderAvances();}
+function ajouterAvance(){avCount++;const m=document.getElementById('mois').value;avances.push({id:avCount,date:m?m+'-01':'',montant:0});renderAvances();}
 window.ajouterAvance=ajouterAvance;
 function suppAvance(id){avances=avances.filter(x=>x.id!==id);renderAvances();}
 window.suppAvance=suppAvance;
@@ -798,7 +798,7 @@ function renderAvances(){
   updateTotaux();
 }
 
-function ajouterDep(){depCount++;deps.push({id:depCount,date:'',fournisseur:'',ventils:[{id:++vCount,cat:null,montant:0}],files:[]});renderDepList();}
+function ajouterDep(){depCount++;const m=document.getElementById('mois').value;deps.push({id:depCount,date:m?m+'-01':'',fournisseur:'',ventils:[{id:++vCount,cat:null,montant:0}],files:[]});renderDepList();}
 window.ajouterDep=ajouterDep;
 function suppDep(id){deps=deps.filter(x=>x.id!==id);renderDepList();}
 window.suppDep=suppDep;
