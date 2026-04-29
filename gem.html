@@ -1182,6 +1182,11 @@ async function envoyerCaisse(){
     for(const a of avances){
       await supabase.from('avances').insert({caisse_id:caisseId,date_avance:a.date||null,montant:a.montant||0});
     }
+    // Vérifier que la caisse est bien visible en base
+    const{data:verif}=await supabase.from('caisses').select('statut_saisie').eq('id',caisseId).single();
+    if(!verif||verif.statut_saisie!=='envoye'){
+      throw new Error('La caisse n\'a pas été correctement enregistrée. Vérifiez votre connexion et réessayez.');
+    }
     await chargerFrise();
     goStep(5);
   } catch(e){
@@ -1209,7 +1214,12 @@ function goStep(n){
   renderStepBar(Math.min(n,4));
   if(n===2){renderDepList();renderParts();updateTotaux();}
   if(n===3)renderComptage();
-  if(n===4)buildRecap();
+  if(n===4){
+    buildRecap();
+    // Toujours réactiver le bouton d'envoi quand on arrive à l'étape 4
+    const btnEnv=document.getElementById('btn-envoyer');
+    if(btnEnv&&!moisValide){btnEnv.disabled=false;btnEnv.textContent='✅ Envoyer à la comptabilité';}
+  }
   if(moisValide&&n!==5){
     document.querySelectorAll('.btn-brouillon,.btn-envoyer,#btn-add-dep,#btn-add-part').forEach(b=>{if(b)b.style.display='none';});
   }
