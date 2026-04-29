@@ -708,13 +708,28 @@ async function chargerDepuisSupabase(c){
   const{data:aavances}=await supabase.from('avances').select('*').eq('caisse_id',c.id);
   const db=c.donnees_brouillon; // snapshot sauvegardé à l'envoi
 
-  // Dépenses
+  // Dépenses — restaurer les ventils depuis le snapshot pour conserver
+  // les catégories multiples et leurs montants individuels
   if(ddeps&&ddeps.length){
-    deps=(ddeps).map((d,i)=>({
-      id:i+1,date:d.date_depense||'',fournisseur:d.fournisseur||'',
-      ventils:[{id:i+1,cat:d.categorie?CATS.find(cc=>cc.label===d.categorie.split(', ')[0])||{label:d.categorie,compte:'Autres',icon:'📦'}:null,montant:d.montant||0}],
-      files:[],justificatif_url:d.justificatif_url||''
-    }));
+    deps=(ddeps).map((d,i)=>{
+      const sd=db?.deps?.find(s=>s.fournisseur===d.fournisseur&&s.date===(d.date_depense||''))||db?.deps?.[i];
+      let ventils;
+      if(sd?.ventils?.length>0){
+        ventils=sd.ventils.map((v,vi)=>({
+          id:(i+1)*100+vi,
+          cat:v.cat?CATS.find(cc=>cc.label===v.cat.label)||v.cat:null,
+          montant:v.montant||0
+        }));
+      } else {
+        const cats=(d.categorie||'').split(', ');
+        ventils=cats.map((label,vi)=>({
+          id:(i+1)*100+vi,
+          cat:CATS.find(cc=>cc.label===label)||{label,compte:'Autres',icon:'📦'},
+          montant:vi===0?d.montant||0:0
+        }));
+      }
+      return{id:i+1,date:d.date_depense||'',fournisseur:d.fournisseur||'',ventils,files:[],justificatif_url:d.justificatif_url||''};
+    });
   } else if(db?.deps?.length){
     deps=(db.deps).map(d=>({...d,files:[]}));
   } else {deps=[];}
@@ -1097,7 +1112,25 @@ function buildRecap(){
     html+=`<div class="recap-sub"><span>${i+1}. ${p.libelle||'—'} ${badge}</span><span>${(p.montant||0).toFixed(2).replace('.',',')} € ${hasJustif?'✅':'⚠️'}</span></div>`;
   });
   const soldeEstime=Math.round((soldePrecedent+ta+tp-td)*100)/100;
-  html+=`<div class="recap-row" style="border-top:2px solid #eee;margin-top:8px;padding-top:12px"><span style="font-weight:600">Solde estimé de clôture</span><span style="font-size:16px;font-weight:600">${soldeEstime.toFixed(2).replace('.',',')} €</span></div>`;
+  html+=`<div class="recap-row" style="border-top:2px solid #eee;margin-top:8px;padding-top:12px"><span style="font-weight:600">Solde théorique de clôture</span><span style="font-size:16px;font-weight:600">${soldeEstime.toFixed(2).replace('.',',')} €</span></div>`;
+
+  // Comptage physique et écart
+  const cptData=comptageEnCours||caisseCourante?.comptage||caisseCourante?.donnees_brouillon?.comptage;
+  if(cptData){
+    let totalCpt=0;
+    BILLETS.forEach(v=>{totalCpt+=v*(cptData.billets?.[String(v)]||0);});
+    PIECES.forEach(v=>{totalCpt=Math.round((totalCpt+v*(cptData.pieces?.[String(v)]||0))*100)/100;});
+    const ecart=Math.round((totalCpt-soldeEstime)*100)/100;
+    const ecartColor=Math.abs(ecart)<0.01?'#16a34a':ecart>0?'#854d0e':'#dc2626';
+    const ecartBg=Math.abs(ecart)<0.01?'#f0fdf4':ecart>0?'#fefce8':'#fff5f5';
+    const ecartTxt=Math.abs(ecart)<0.01?'✅ Conforme':(ecart>0?'📈 +':'📉 ')+ecart.toFixed(2).replace('.',',')+' €';
+    html+=`
+      <div class="recap-row" style="margin-top:4px"><span style="color:#888">Comptage physique</span><span style="font-weight:600">${totalCpt.toFixed(2).replace('.',',')} €</span></div>
+      <div class="recap-row" style="background:${ecartBg};border-radius:8px;padding:8px 10px;margin-top:4px">
+        <span style="font-weight:600;color:#555">Écart caisse</span>
+        <span style="font-weight:700;color:${ecartColor}">${ecartTxt}</span>
+      </div>`;
+  }
   document.getElementById('recap-content').innerHTML=html;
   const obsEl=document.getElementById('observations');
   if(obsEl&&caisseCourante?.notes)obsEl.value=caisseCourante.notes;
