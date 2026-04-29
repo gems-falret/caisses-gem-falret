@@ -434,6 +434,23 @@ async function ouvrirCompteRendu(moisStr){
   const{data:ddeps}=await supabase.from('depenses').select('*').eq('caisse_id',c.id);
   const{data:pparts}=await supabase.from('participations').select('*').eq('caisse_id',c.id);
   const{data:aavances}=await supabase.from('avances').select('*').eq('caisse_id',c.id);
+
+  // Fallback sur snapshot si tables vides (problème RLS)
+  const db=c.donnees_brouillon;
+  const finalDeps=ddeps?.length?ddeps:(db?.deps||[]).map(d=>({
+    fournisseur:d.fournisseur||'',date_depense:d.date||null,
+    categorie:(d.ventils||[]).filter(v=>v.cat).map(v=>v.cat.label).join(', ')||'—',
+    montant:(d.ventils||[]).reduce((s,v)=>s+(v.montant||0),0),
+    justificatif_url:d.justificatif_url||''
+  }));
+  const finalParts=pparts?.length?pparts:(db?.parts||[]).map(p=>({
+    libelle:p.libelle||'',montant:p.montant||0,
+    type:p.type||'participation',justificatif_url:p.justificatif_url||''
+  }));
+  const finalAvances=aavances?.length?aavances:(db?.avances||[]).map(a=>({
+    date_avance:a.date||null,montant:a.montant||0
+  }));
+
   const estValide=c.statut==='valide';
 
   let html='';
@@ -451,35 +468,35 @@ async function ouvrirCompteRendu(moisStr){
 
   if(c.notes)html+=`<div class="cr-section"><div class="cr-section-title">Observations</div><div class="cr-obs">${c.notes}</div></div>`;
 
-  if(aavances&&aavances.length){
-    html+=`<div class="cr-section"><div class="cr-section-title">Avances reçues (${aavances.length})</div>`;
-    aavances.forEach(a=>{html+=`<div class="cr-row"><span style="color:#888">${a.date_avance||'—'}</span><span style="color:#16a34a">+${(a.montant||0).toFixed(2).replace('.',',')} €</span></div>`;});
-    html+=`</div>`;
+  if(finalAvances.length){
+    html+=`<div class="cr-section"><div class="cr-section-title">Avances reçues (${finalAvances.length})</div>`;
+    finalAvances.forEach(a=>{html+=`<div class="cr-row"><span style="color:#888">${a.date_avance||'—'}</span><span style="color:#16a34a;font-weight:600">+${(a.montant||0).toFixed(2).replace('.',',')} €</span></div>`;});
+    html+=`<div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total avances</span><span style="color:#16a34a;font-weight:600">+${finalAvances.reduce((s,a)=>s+(a.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
   }
 
-  if(ddeps&&ddeps.length){
-    html+=`<div class="cr-section"><div class="cr-section-title" style="color:#A32D2D">Dépenses (${ddeps.length})</div>`;
-    ddeps.forEach(d=>{
+  if(finalDeps.length){
+    html+=`<div class="cr-section"><div class="cr-section-title" style="color:#A32D2D">Dépenses (${finalDeps.length})</div>`;
+    finalDeps.forEach(d=>{
       const justifUrls=d.justificatif_url?d.justificatif_url.split(',').filter(u=>u.trim()):[];
       html+=`<div class="cr-dep" style="border-left:3px solid #F7C1C1">
-        <div class="cr-dep-titre">${d.fournisseur||'—'} <span style="color:#dc2626;float:right">${(d.montant||0).toFixed(2).replace('.',',')} €</span></div>
+        <div class="cr-dep-titre">${d.fournisseur||'—'} <span style="color:#dc2626;float:right;font-weight:600">${(d.montant||0).toFixed(2).replace('.',',')} €</span></div>
         <div class="cr-dep-detail">${d.date_depense||'—'} · ${d.categorie||'—'}</div>
         <div style="margin-top:6px">${justifUrls.length>0?justifUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join(' '):'<span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">❌ Pas de justificatif</span>'}</div>
       </div>`;
     });
-    html+=`</div>`;
+    html+=`<div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total dépenses</span><span style="color:#dc2626;font-weight:600">-${finalDeps.reduce((s,d)=>s+(d.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
   }
 
-  if(pparts&&pparts.length){
-    const participations=pparts.filter(p=>!p.type||p.type==='participation');
-    const cotisations=pparts.filter(p=>p.type==='cotisation');
+  if(finalParts.length){
+    const participations=finalParts.filter(p=>!p.type||p.type==='participation');
+    const cotisations=finalParts.filter(p=>p.type==='cotisation');
 
     if(participations.length){
       html+=`<div class="cr-section"><div class="cr-section-title" style="color:#0F6E56">Participations adhérents (${participations.length})</div>`;
       participations.forEach(p=>{
         const justifUrls=p.justificatif_url?p.justificatif_url.split(',').filter(u=>u.trim()):[];
         html+=`<div class="cr-dep" style="border-left:3px solid #9FE1CB">
-          <div class="cr-dep-titre">${p.libelle||'—'} <span style="color:#16a34a;float:right">+${(p.montant||0).toFixed(2).replace('.',',')} €</span></div>
+          <div class="cr-dep-titre">${p.libelle||'—'} <span style="color:#16a34a;float:right;font-weight:600">+${(p.montant||0).toFixed(2).replace('.',',')} €</span></div>
           <div style="margin-top:6px">${justifUrls.length>0?justifUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join(' '):'<span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">❌ Pas de justificatif</span>'}</div>
         </div>`;
       });
@@ -491,11 +508,15 @@ async function ouvrirCompteRendu(moisStr){
       cotisations.forEach(p=>{
         const justifUrls=p.justificatif_url?p.justificatif_url.split(',').filter(u=>u.trim()):[];
         html+=`<div class="cr-dep" style="border-left:3px solid #fde047">
-          <div class="cr-dep-titre">${p.libelle||'—'} <span style="color:#16a34a;float:right">+${(p.montant||0).toFixed(2).replace('.',',')} €</span></div>
+          <div class="cr-dep-titre">${p.libelle||'—'} <span style="color:#16a34a;float:right;font-weight:600">+${(p.montant||0).toFixed(2).replace('.',',')} €</span></div>
           <div style="margin-top:6px">${justifUrls.length>0?justifUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join(' '):'<span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">❌ Pas de justificatif</span>'}</div>
         </div>`;
       });
       html+=`</div>`;
+    }
+
+    if(participations.length||cotisations.length){
+      html+=`<div class="cr-section"><div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total participations/cotisations</span><span style="color:#16a34a;font-weight:600">+${finalParts.reduce((s,p)=>s+(p.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
     }
   }
 
@@ -595,13 +616,33 @@ async function chargerDepuisSupabase(c){
   const{data:ddeps}=await supabase.from('depenses').select('*').eq('caisse_id',c.id);
   const{data:pparts}=await supabase.from('participations').select('*').eq('caisse_id',c.id);
   const{data:aavances}=await supabase.from('avances').select('*').eq('caisse_id',c.id);
-  deps=(ddeps||[]).map((d,i)=>({
-    id:i+1,date:d.date_depense||'',fournisseur:d.fournisseur||'',
-    ventils:[{id:i+1,cat:d.categorie?CATS.find(c=>c.label===d.categorie.split(', ')[0])||{label:d.categorie,compte:'Autres',icon:'📦'}:null,montant:d.montant||0}],
-    files:[],justificatif_url:d.justificatif_url||''
-  }));
-  parts=(pparts||[]).map((p,i)=>({id:i+1,libelle:p.libelle||'',montant:p.montant||0,type:p.type||'participation',files:[],justificatif_url:p.justificatif_url||''}));
-  avances=(aavances||[]).map((a,i)=>({id:i+1,date:a.date_avance||'',montant:a.montant||0}));
+  const db=c.donnees_brouillon; // snapshot sauvegardé à l'envoi
+
+  // Dépenses
+  if(ddeps&&ddeps.length){
+    deps=(ddeps).map((d,i)=>({
+      id:i+1,date:d.date_depense||'',fournisseur:d.fournisseur||'',
+      ventils:[{id:i+1,cat:d.categorie?CATS.find(cc=>cc.label===d.categorie.split(', ')[0])||{label:d.categorie,compte:'Autres',icon:'📦'}:null,montant:d.montant||0}],
+      files:[],justificatif_url:d.justificatif_url||''
+    }));
+  } else if(db?.deps?.length){
+    deps=(db.deps).map(d=>({...d,files:[]}));
+  } else {deps=[];}
+
+  // Participations — fallback snapshot si table vide
+  if(pparts&&pparts.length){
+    parts=(pparts).map((p,i)=>({id:i+1,libelle:p.libelle||'',montant:p.montant||0,type:p.type||'participation',files:[],justificatif_url:p.justificatif_url||''}));
+  } else if(db?.parts?.length){
+    parts=(db.parts).map(p=>({...p,files:[]}));
+  } else {parts=[];}
+
+  // Avances — fallback snapshot si table vide
+  if(aavances&&aavances.length){
+    avances=(aavances).map((a,i)=>({id:i+1,date:a.date_avance||'',montant:a.montant||0}));
+  } else if(db?.avances?.length){
+    avances=(db.avances).map(a=>({...a}));
+  } else {avances=[];}
+
   depCount=deps.length;partCount=parts.length;avCount=avances.length;vCount=deps.length;
   renderAvances();updateTotaux();
   setTimeout(()=>goStep(2),100);
