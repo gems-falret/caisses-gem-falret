@@ -151,6 +151,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .est-blue{background:#dbeafe;color:#1d4ed8}
 .est-red{background:#fff0f0;color:#b91c1c}
 .est-green{background:#d1fae5;color:#059669}
+.est-purple{background:#f3e8ff;color:#7c3aed}
 .est-amber{background:#fef3c7;color:#d97706}
 .edit-table{width:100%;border-collapse:collapse;font-size:13px}
 .edit-table th{padding:7px 10px;text-align:left;background:#f8f8f8;border-bottom:2px solid #eee;font-size:11px;font-weight:600;color:#555;text-transform:uppercase;white-space:nowrap}
@@ -389,7 +390,7 @@ window.loadCaisses=loadCaisses;
 function caisseStatutType(c){
   if(!c)return'absent';
   if(c.statut==='valide')return'valide';
-  if((c.donnees_brouillon?.send_count||0)>1)return'modif';
+  if((c.donnees_brouillon?.send_count||0)>1&&!c.donnees_brouillon?.vu_compta)return'modif';
   return'recue';
 }
 
@@ -476,6 +477,16 @@ window.openDetail=async function(gem){
 
   if(c){
     if(!adjustments[c.id])adjustments[c.id]=[];
+
+    // Marquer comme vu par la compta (retire le badge "Modification")
+    if(caisseStatutType(c)==='modif'&&c.donnees_brouillon){
+      const newSnap={...c.donnees_brouillon,vu_compta:true};
+      supabase.from('caisses').update({donnees_brouillon:newSnap}).eq('id',c.id);
+      c.donnees_brouillon=newSnap;
+      const inList=caisses.find(x=>x.id===c.id);
+      if(inList)inList.donnees_brouillon=newSnap;
+      updateMetrics();
+    }
 
     // Toujours interroger les tables en premier
     const[dr,pr,ar]=await Promise.all([
@@ -912,7 +923,6 @@ function renderTabEcriture(){
           <button class="btn-copy" id="btn-copy-ecr" onclick="window._copierEcr()">Copier tout</button>
         </div>
         <div style="font-size:12px;color:#888;margin-bottom:.5rem">
-          <span style="background:#fef9c3;padding:1px 5px;border-radius:3px;margin-right:6px">Orange = ajustement manuel</span>
           <span style="background:#dbeafe;padding:1px 5px;border-radius:3px">Bleu = solde caisse</span>
         </div>
         <div class="cegi-block">
@@ -932,23 +942,6 @@ function renderTabEcriture(){
             <span>Crédit : <strong style="color:#1a1a1a">${tC.toFixed(2)} €</strong></span>
           </div>
           <span class="badge ${eq?'b-ok':'b-err'}">${eq?'✓ Écriture équilibrée':'⚠ Déséquilibre'}</span>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title" style="margin-bottom:1rem">Ajustements manuels</div>
-        <div class="adj-block">
-          ${adj.map((a,i)=>`<div class="adj-row">
-            <input class="adj-inp" type="text" placeholder="Compte" value="${a.compte||''}" onchange="window._adjData['${c.id}'][${i}].compte=this.value;window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
-            <input class="adj-inp" type="text" placeholder="Libellé" value="${a.lib||''}" onchange="window._adjData['${c.id}'][${i}].lib=this.value;window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
-            <input class="adj-inp" type="text" placeholder="Anal." value="${a.anal||''}" onchange="window._adjData['${c.id}'][${i}].anal=this.value;window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
-            <select class="adj-inp" onchange="window._adjToggle('${c.id}',${i},this.value)">
-              <option value="debit" ${(a.debit||0)>0?'selected':''}>Débit</option>
-              <option value="credit" ${(a.credit||0)>0?'selected':''}>Crédit</option>
-            </select>
-            <input class="adj-inp" type="number" placeholder="0,00" value="${(a.debit||0)>0?a.debit:(a.credit||0)>0?a.credit:''}" onchange="window._adjMt('${c.id}',${i},this.value);window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
-            <button onclick="window._adjData['${c.id}'].splice(${i},1);window._rerenderEcr()" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:18px">×</button>
-          </div>`).join('')}
-          <button class="add-adj-btn" onclick="window._adjData['${c.id}'].push({compte:'',lib:'',anal:'${cfg.anal||''}',debit:0,credit:0});window._rerenderEcr()">+ Ajouter une ligne manuelle</button>
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.25rem">
@@ -1247,11 +1240,13 @@ window._editData=null;
 window.ouvrirEditCaisse=function(){
   if(!currentCaisse)return;
   const c=currentCaisse;
+  const cpt=c.comptage||{billets:{},pieces:{}};
   window._editData={
     responsable:c.responsable||'',notes:c.notes||'',
     avances:currentAvances.map(a=>({date:a.date_avance||'',montant:a.montant||0})),
     deps:currentDeps.map(d=>({date:d.date_depense||'',fournisseur:d.fournisseur||'',categorie:d.categorie||'',compte:d.compte||'',montant:d.montant||0})),
     parts:currentParts.map(p=>({libelle:p.libelle||'',type:p.type||'participation',montant:p.montant||0})),
+    comptage:{billets:{...((cpt.billets)||{})},pieces:{...((cpt.pieces)||{})}},
   };
   document.getElementById('edit-modal-subtitle').textContent='GEM '+c.gem+' — '+moisNom();
   window._renderEditModal();
@@ -1264,6 +1259,23 @@ window.fermerEditCaisse=function(){
 };
 
 function _fmtE(n){return(parseFloat(n)||0).toFixed(2).replace('.',',');}
+
+window._recalcEditComptage=function(){
+  if(!window._editData)return;
+  const e=window._editData;
+  const tB=BILLETS.reduce((s,v)=>s+v*(e.comptage.billets[String(v)]||0),0);
+  const tP=PIECES.reduce((s,v)=>Math.round((s+v*(e.comptage.pieces[String(v)]||0))*100)/100,0);
+  const tc=Math.round((tB+tP)*100)/100;
+  const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
+  const td=e.deps.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+  const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
+  const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
+  const ev=Math.round((tc-solde)*100)/100;
+  const el=document.getElementById('edit-cpt-total');
+  if(el)el.innerHTML=`<span>Total comptage</span><span>${_fmtE(tc)} €</span>`;
+  const el2=document.getElementById('edit-ecart-val');
+  if(el2){el2.textContent=Math.abs(ev)<0.01?'Conforme':(ev>0?'+':'')+_fmtE(ev)+' €';el2.parentElement.style.color=Math.abs(ev)<0.01?'#16a34a':ev>0?'#d97706':'#dc2626';}
+};
 
 window._recalcEdit=function(){
   if(!window._editData)return;
@@ -1328,9 +1340,41 @@ window._renderEditModal=function(){
     </tbody></table>
     <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0});window._renderEditModal()">+ Ajouter une ligne</button></div>`;
 
-  const tc=totalComptage(currentCaisse);
-  const ev=tc!==null?Math.round((tc-solde)*100)/100:null;
-  const ecartLine=ev!==null?`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:${Math.abs(ev)<0.01?'#16a34a':ev>0?'#d97706':'#dc2626'}"><span>Écart comptage</span><span>${Math.abs(ev)<0.01?'Conforme':(ev>0?'+':'')+_fmtE(ev)+' €'}</span></div>`:'';
+  // Comptage section
+  const eb2=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;
+  const cptUpdateFn=(type,val)=>`window._editData.comptage.${type}[String(${val})]=parseInt(this.value)||0;window._recalcEditComptage()`;
+  const billetsHtml=BILLETS.map(v=>`<tr>
+    <td style="font-weight:600">${v>=1?v+' €':Math.round(v*100)+' c'}</td>
+    <td><input class="edit-inp" type="number" min="0" style="text-align:center;max-width:80px" value="${e.comptage.billets[String(v)]||0}" onchange="${cptUpdateFn('billets',v)}" ${eb2}></td>
+    <td style="text-align:right;color:#555">${_fmtE(v*(e.comptage.billets[String(v)]||0))} €</td>
+  </tr>`).join('');
+  const piecesHtml=PIECES.map(v=>`<tr>
+    <td style="font-weight:600">${v>=1?v+' €':Math.round(v*100)+' c'}</td>
+    <td><input class="edit-inp" type="number" min="0" style="text-align:center;max-width:80px" value="${e.comptage.pieces[String(v)]||0}" onchange="${cptUpdateFn('pieces',v)}" ${eb2}></td>
+    <td style="text-align:right;color:#555">${_fmtE(v*(e.comptage.pieces[String(v)]||0))} €</td>
+  </tr>`).join('');
+  const tBEdit=BILLETS.reduce((s,v)=>s+v*(e.comptage.billets[String(v)]||0),0);
+  const tPEdit=PIECES.reduce((s,v)=>Math.round((s+v*(e.comptage.pieces[String(v)]||0))*100)/100,0);
+  const tcEdit=Math.round((tBEdit+tPEdit)*100)/100;
+  const cptHtml=`<div class="edit-section"><div class="edit-section-title est-purple">Comptage</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:.4rem">Billets</div>
+        <table class="edit-table"><thead><tr><th>Valeur</th><th style="text-align:center">Qté</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>${billetsHtml}</tbody></table>
+        <div class="comptage-sub" style="margin-top:4px">Total billets <span>${_fmtE(tBEdit)} €</span></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:.4rem">Pièces</div>
+        <table class="edit-table"><thead><tr><th>Valeur</th><th style="text-align:center">Qté</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>${piecesHtml}</tbody></table>
+        <div class="comptage-sub" style="margin-top:4px">Total pièces <span>${_fmtE(tPEdit)} €</span></div>
+      </div>
+    </div>
+    <div id="edit-cpt-total" style="display:flex;justify-content:space-between;padding:8px 10px;background:#f3e8ff;border-radius:8px;margin-top:.75rem;font-weight:700;font-size:14px;color:#7c3aed"><span>Total comptage</span><span>${_fmtE(tcEdit)} €</span></div>
+  </div>`;
+
+  // Ecart using editData comptage
+  const ev=Math.round((tcEdit-solde)*100)/100;
+  const ecartLine=`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:${Math.abs(ev)<0.01?'#16a34a':ev>0?'#d97706':'#dc2626'}"><span>Écart comptage</span><span id="edit-ecart-val">${Math.abs(ev)<0.01?'Conforme':(ev>0?'+':'')+_fmtE(ev)+' €'}</span></div>`;
 
   document.getElementById('modal-edit-content').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem">
@@ -1339,11 +1383,11 @@ window._renderEditModal=function(){
       <div><label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;display:block;margin-bottom:5px">Notes comptable</label>
         <input class="edit-inp" type="text" value="${e.notes||''}" onchange="window._editData.notes=this.value" ${eb}></div>
     </div>
-    ${avHtml}${depHtml}${partHtml}
+    ${avHtml}${depHtml}${partHtml}${cptHtml}
     <div class="edit-summary">
       <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Récapitulatif recalculé</div>
       <div id="edit-summary-block">${_buildSummaryHtml(ta,td,tp,solde)}</div>
-      ${ecartLine?`<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid #eee">${ecartLine}</div>`:''}
+      <div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid #eee">${ecartLine}</div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:.5rem;border-top:1px solid #eee">
       <button onclick="window.fermerEditCaisse()" style="padding:10px 20px;border-radius:10px;border:1px solid #ddd;background:white;font-size:13px;cursor:pointer;font-family:inherit">Annuler</button>
@@ -1376,17 +1420,18 @@ window.sauvegarderEditCaisse=async function(){
       })),
       is_snapshot:true,send_count:currentCaisse.donnees_brouillon?.send_count||1,comptable_modifie:true
     };
+    const newComptage={billets:{...e.comptage.billets},pieces:{...e.comptage.pieces}};
     const{error}=await supabase.from('caisses').update({
       responsable:e.responsable,notes:e.notes,
       total_avances:Math.round(ta*100)/100,total_depenses:Math.round(td*100)/100,
       total_participations:Math.round(tp*100)/100,solde_cloture:solde,
-      donnees_brouillon:snap
+      comptage:newComptage,donnees_brouillon:snap
     }).eq('id',currentCaisse.id);
     if(error)throw error;
     currentCaisse.responsable=e.responsable;currentCaisse.notes=e.notes;
     currentCaisse.total_avances=Math.round(ta*100)/100;currentCaisse.total_depenses=Math.round(td*100)/100;
     currentCaisse.total_participations=Math.round(tp*100)/100;currentCaisse.solde_cloture=solde;
-    currentCaisse.donnees_brouillon=snap;
+    currentCaisse.comptage=newComptage;currentCaisse.donnees_brouillon=snap;
     currentAvances=snap.avances.map(a=>({...a,date_avance:a.date}));
     currentDeps=snap.deps.map(d=>({...d,date_depense:d.date,categorie:d.ventils.map(v=>v.cat?.label||'').join(', '),montant:d.ventils.reduce((s,v)=>s+(v.montant||0),0)}));
     currentParts=snap.parts.map(p=>({...p}));
