@@ -783,6 +783,11 @@ async function updateMois(val){
     } else if(existing.statut_saisie==='brouillon'){
       alertEl.innerHTML=`<div class="alert-warn"><p>📝 Brouillon sauvegardé — tu repars de là où tu t'étais arrêté.</p></div>`;
       setLocked(false);chargerDonnees(existing);
+    } else if(existing.donnees_brouillon?.comptable_modifie){
+      alertEl.innerHTML=`<div class="alert-valide"><p>🔒 La comptabilité a modifié cette caisse — consultation uniquement.</p></div>`;
+      await chargerDepuisSupabase(existing);
+      moisValide=true;
+      setLocked(true);
     } else {
       alertEl.innerHTML=`<div class="alert-ok"><p>✅ Caisse déjà envoyée ce mois. Tu peux la modifier et renvoyer.</p></div>`;
       setLocked(false);await chargerDepuisSupabase(existing);
@@ -959,7 +964,15 @@ function updateDepFourn(id,v){const d=deps.find(x=>x.id===id);if(d)d.fournisseur
 window.updateDepFourn=updateDepFourn;
 function selectCat(depId,vId,label){const d=deps.find(x=>x.id===depId);if(d){const v=d.ventils.find(x=>x.id===vId);if(v)v.cat=label?CATS.find(c=>c.label===label)||null:null;}updateTotaux();}
 window.selectCat=selectCat;
-function updateVentilMontant(depId,vId,v){const d=deps.find(x=>x.id===depId);if(d){const vt=d.ventils.find(x=>x.id===vId);if(vt)vt.montant=parseFloat(v)||0;}updateTotaux();}
+function updateVentilMontant(depId,vId,v){
+  const d=deps.find(x=>x.id===depId);
+  if(d){const vt=d.ventils.find(x=>x.id===vId);if(vt)vt.montant=parseFloat(v)||0;}
+  updateTotaux();
+  // Mise à jour directe du total en haut à droite de la carte
+  const tot=d?depTotal(d):0;
+  const el=document.getElementById('dep-card-total-'+depId);
+  if(el){el.textContent=tot>0?tot.toFixed(2).replace('.',',')+' €':'';el.style.display=tot>0?'inline':'none';}
+}
 window.updateVentilMontant=updateVentilMontant;
 function ajouterVentil(depId){const d=deps.find(x=>x.id===depId);if(d)d.ventils.push({id:++vCount,cat:null,montant:0});renderDepList();}
 window.ajouterVentil=ajouterVentil;
@@ -1019,7 +1032,7 @@ function renderDepList(){
           <span style="font-size:11px;padding:2px 8px;border-radius:6px;background:${ok?'#dcfce7':'#fef9c3'};color:${ok?'#16a34a':'#854d0e'}">${ok?'Complet':'À compléter'}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          ${tot>0?`<span style="font-size:14px;font-weight:600;color:#dc2626">${tot.toFixed(2).replace('.',',')} €</span>`:''}
+          <span id="dep-card-total-${d.id}" style="font-size:14px;font-weight:600;color:#dc2626;${tot>0?'':'display:none'}">${tot>0?tot.toFixed(2).replace('.',',')+' €':''}</span>
           <button onclick="window.suppDep(${d.id})" style="border:none;background:none;color:#aaa;cursor:pointer;font-size:18px">×</button>
         </div>
       </div>
@@ -1061,7 +1074,13 @@ function suppPart(id){parts=parts.filter(x=>x.id!==id);renderParts();}
 window.suppPart=suppPart;
 function updatePartLibelle(id,v){const p=parts.find(x=>x.id===id);if(p)p.libelle=v;updateTotaux();}
 window.updatePartLibelle=updatePartLibelle;
-function updatePartMontant(id,v){const p=parts.find(x=>x.id===id);if(p)p.montant=parseFloat(v)||0;updateTotaux();}
+function updatePartMontant(id,v){
+  const p=parts.find(x=>x.id===id);
+  if(p)p.montant=parseFloat(v)||0;
+  updateTotaux();
+  const el=document.getElementById('part-card-total-'+id);
+  if(el){el.textContent=(p&&p.montant>0)?p.montant.toFixed(2).replace('.',',')+' €':'';}
+}
 window.updatePartMontant=updatePartMontant;
 function updatePartType(id,v){const p=parts.find(x=>x.id===id);if(p)p.type=v;}
 window.updatePartType=updatePartType;
@@ -1102,10 +1121,17 @@ window.supprimerJustifPart=async function(id,url){
 function renderParts(){
   const el=document.getElementById('part-list');if(!el)return;
   if(!parts.length){el.innerHTML='<p style="font-size:13px;color:#aaa;font-style:italic;margin-bottom:.75rem">Aucune participation ce mois.</p>';updateTotaux();return;}
-  el.innerHTML=parts.map(p=>{
+  el.innerHTML=parts.map((p,i)=>{
     const savedUrls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
     const isCotisation=p.type==='cotisation';
     return`<div class="part-row">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:-10px -10px 10px;padding:.6rem .875rem;background:${isCotisation?'#fef3c7':'#f0fdf4'};border-radius:8px 8px 0 0;border-bottom:1px solid ${isCotisation?'#fde047':'#9FE1CB'}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:22px;height:22px;border-radius:50%;background:${isCotisation?'#d97706':'#059669'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:white">${i+1}</div>
+          <span style="font-size:13px;font-weight:600;color:${isCotisation?'#92400e':'#065f46'}">${p.libelle||'Nouvelle participation'}</span>
+        </div>
+        <span id="part-card-total-${p.id}" style="font-size:14px;font-weight:700;color:${isCotisation?'#d97706':'#059669'}">${(p.montant||0)>0?(p.montant||0).toFixed(2).replace('.',',')+' €':''}</span>
+      </div>
       <div class="row3">
         <div class="field"><label>Libellé</label>
           <input type="text" placeholder="ex. Sortie cinéma..." value="${p.libelle||''}" onchange="window.updatePartLibelle(${p.id},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
@@ -1283,7 +1309,8 @@ async function envoyerCaisse(){
     parts:parts.map(p=>({...p,files:[]})),
     avances,
     is_snapshot:true,
-    send_count:prevCount+1
+    send_count:prevCount+1,
+    vu_compta:false
   };
   let caisseId=null;
   try{
