@@ -843,23 +843,42 @@ function renderTabEcriture(){
     const rows=[];
     const grouped={};
     currentDeps.forEach(d=>{
-      const ventils=d.ventils?.length>0?d.ventils:null;
-      const cats=d.categorie?d.categorie.split(', ').filter(Boolean):['DIVERS'];
-      const comptes=d.compte?d.compte.split(', ').filter(Boolean):['Autres'];
-      cats.forEach((cat,i)=>{
-        const compte=comptes[i]||comptes[0]||'Autres';
-        // Montant exact depuis ventils si disponible, sinon division égale
-        const montant=ventils?(ventils[i]?.montant||0):(d.montant/cats.length);
-        if(!grouped[compte])grouped[compte]={compte,lib:cat.toUpperCase(),montant:0};
-        grouped[compte].montant+=montant;
-      });
+      if(d.ventils?.length>0){
+        // Always use ventils directly — each ventil has its own compte and libellé
+        d.ventils.forEach(v=>{
+          const compte=(v.cat?.compte||'Autres');
+          const lib=(v.cat?.label||'DIVERS').toUpperCase();
+          const montant=v.montant||0;
+          const key=compte+'|'+lib;
+          if(!grouped[key])grouped[key]={compte,lib,montant:0};
+          grouped[key].montant+=montant;
+        });
+      } else {
+        const cats=d.categorie?d.categorie.split(', ').filter(Boolean):['DIVERS'];
+        const comptes=d.compte?d.compte.split(', ').filter(Boolean):['Autres'];
+        cats.forEach((cat,i)=>{
+          const compte=comptes[i]||comptes[0]||'Autres';
+          const montant=d.montant/cats.length;
+          const key=compte+'|'+cat.toUpperCase();
+          if(!grouped[key])grouped[key]={compte,lib:cat.toUpperCase(),montant:0};
+          grouped[key].montant+=montant;
+        });
+      }
     });
     Object.values(grouped).forEach(g=>rows.push({compte:g.compte,anal:cfg.anal||'',lib:g.lib,debit:Math.round(g.montant*100)/100,credit:0,adj:false}));
     const parts=currentParts||[];
-    const tPart=parts.filter(p=>!p.type||p.type==='participation').reduce((s,p)=>s+(p.montant||0),0);
-    const tCotis=parts.filter(p=>p.type==='cotisation').reduce((s,p)=>s+(p.montant||0),0);
-    if(tPart>0)rows.push({compte:'70820000',anal:cfg.anal||'',lib:'PARTICIPATIONS ADHERENTS',debit:0,credit:Math.round(tPart*100)/100,adj:false});
-    if(tCotis>0)rows.push({compte:'75600000',anal:cfg.anal||'',lib:'ADHESIONS ADHERENTS',debit:0,credit:Math.round(tCotis*100)/100,adj:false});
+    // Group participations by compte (use custom compte if set, else default by type)
+    const partGrouped={};
+    parts.forEach(p=>{
+      const isAdh=p.type==='cotisation';
+      const defCompte=isAdh?'75600000':'70820000';
+      const compte=p.compte||defCompte;
+      const lib=isAdh?'ADHESIONS ADHERENTS':'PARTICIPATIONS ADHERENTS';
+      const key=compte+'|'+lib;
+      if(!partGrouped[key])partGrouped[key]={compte,lib,montant:0};
+      partGrouped[key].montant+=p.montant||0;
+    });
+    Object.values(partGrouped).forEach(g=>{if(g.montant>0)rows.push({compte:g.compte,anal:cfg.anal||'',lib:g.lib,debit:0,credit:Math.round(g.montant*100)/100,adj:false});});
     (adjustments[c.id]||[]).forEach(a=>rows.push({...a,adj:true}));
     const tD=rows.reduce((s,r)=>s+r.debit,0),tC=rows.reduce((s,r)=>s+r.credit,0);
     rows.push({compte:cfg.compte||'531XXXXX',anal:cfg.anal||'',lib:`CAISSE ${c.gem.toUpperCase()} ${ref}`,debit:0,credit:Math.round((tD-tC)*100)/100,last:true});
@@ -1241,11 +1260,15 @@ window.ouvrirEditCaisse=function(){
   if(!currentCaisse)return;
   const c=currentCaisse;
   const cpt=c.comptage||{billets:{},pieces:{}};
+  const snapDeps=c.donnees_brouillon?.deps||[];
   window._editData={
     responsable:c.responsable||'',notes:c.notes||'',
     avances:currentAvances.map(a=>({date:a.date_avance||'',montant:a.montant||0})),
-    deps:currentDeps.map(d=>({date:d.date_depense||'',fournisseur:d.fournisseur||'',categorie:d.categorie||'',compte:d.compte||'',montant:d.montant||0})),
-    parts:currentParts.map(p=>({libelle:p.libelle||'',type:p.type||'participation',montant:p.montant||0})),
+    deps:(snapDeps.length?snapDeps:currentDeps.map(d=>({date:d.date_depense,fournisseur:d.fournisseur,ventils:[{cat:{label:d.categorie,compte:d.compte},montant:d.montant}],justificatif_url:d.justificatif_url}))).map(d=>({
+      date:d.date||d.date_depense||'',fournisseur:d.fournisseur||'',justificatif_url:d.justificatif_url||'',
+      ventils:(d.ventils||[{cat:{label:'Autres',compte:''},montant:0}]).map(v=>({libelle:v.cat?.label||'',compte:v.cat?.compte||'',montant:v.montant||0}))
+    })),
+    parts:(c.donnees_brouillon?.parts||currentParts).map(p=>({libelle:p.libelle||'',type:p.type||'participation',montant:p.montant||0,compte:p.compte||''})),
     comptage:{billets:{...((cpt.billets)||{})},pieces:{...((cpt.pieces)||{})}},
   };
   document.getElementById('edit-modal-subtitle').textContent='GEM '+c.gem+' — '+moisNom();
@@ -1267,7 +1290,7 @@ window._recalcEditComptage=function(){
   const tP=PIECES.reduce((s,v)=>Math.round((s+v*(e.comptage.pieces[String(v)]||0))*100)/100,0);
   const tc=Math.round((tB+tP)*100)/100;
   const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
-  const td=e.deps.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+  const td=e.deps.reduce((s,d)=>s+d.ventils.reduce((sv,v)=>sv+(parseFloat(v.montant)||0),0),0);
   const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
   const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
   const ev=Math.round((tc-solde)*100)/100;
@@ -1281,7 +1304,7 @@ window._recalcEdit=function(){
   if(!window._editData)return;
   const e=window._editData;
   const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
-  const td=e.deps.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+  const td=e.deps.reduce((s,d)=>s+d.ventils.reduce((sv,v)=>sv+(parseFloat(v.montant)||0),0),0);
   const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
   const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
   const el=document.getElementById('edit-summary-block');
@@ -1299,7 +1322,7 @@ function _buildSummaryHtml(ta,td,tp,solde){
 window._renderEditModal=function(){
   const e=window._editData;
   const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
-  const td=e.deps.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
+  const td=e.deps.reduce((s,d)=>s+d.ventils.reduce((sv,v)=>sv+(parseFloat(v.montant)||0),0),0);
   const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
   const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
   const eb=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;
@@ -1316,29 +1339,40 @@ window._renderEditModal=function(){
     <button class="edit-add-btn" onclick="window._editData.avances.push({date:'',montant:0});window._renderEditModal()">+ Ajouter une avance</button></div>`;
 
   const depHtml=`<div class="edit-section"><div class="edit-section-title est-red">Dépenses (${e.deps.length})</div>
-    <table class="edit-table"><thead><tr><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Compte</th><th>Montant</th><th></th></tr></thead><tbody>
-    ${e.deps.map((d,i)=>`<tr>
-      <td><input ${ic} type="date" value="${d.date}" onchange="window._editData.deps[${i}].date=this.value" ${eb}></td>
-      <td><input ${ic} type="text" value="${d.fournisseur||''}" onchange="window._editData.deps[${i}].fournisseur=this.value" ${eb}></td>
-      <td><input ${ic} type="text" value="${d.categorie||''}" onchange="window._editData.deps[${i}].categorie=this.value" ${eb}></td>
-      <td><input ${ic} type="text" value="${d.compte||''}" style="font-family:monospace;font-size:12px" onchange="window._editData.deps[${i}].compte=this.value" ${eb}></td>
-      <td><input ${ic} type="number" style="text-align:right" value="${d.montant||0}" onchange="window._editData.deps[${i}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
-      <td><button class="edit-del-btn" onclick="window._editData.deps.splice(${i},1);window._renderEditModal()">×</button></td>
-    </tr>`).join('')}
-    </tbody></table>
-    <button class="edit-add-btn" onclick="window._editData.deps.push({date:'',fournisseur:'',categorie:'',compte:'',montant:0});window._renderEditModal()">+ Ajouter une dépense</button></div>`;
+    ${e.deps.map((d,di)=>{
+      const dTot=d.ventils.reduce((s,v)=>s+(parseFloat(v.montant)||0),0);
+      return`<div style="border:1px solid #fca5a5;border-radius:8px;margin-bottom:8px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:130px 1fr auto auto;gap:6px;align-items:center;padding:8px 10px;background:#fff5f5">
+          <input ${ic} type="date" value="${d.date}" onchange="window._editData.deps[${di}].date=this.value" ${eb}>
+          <input ${ic} type="text" placeholder="Fournisseur" value="${d.fournisseur||''}" onchange="window._editData.deps[${di}].fournisseur=this.value" ${eb}>
+          <span style="font-weight:700;color:#b91c1c;white-space:nowrap">${_fmtE(dTot)} €</span>
+          <button class="edit-del-btn" onclick="window._editData.deps.splice(${di},1);window._renderEditModal()">×</button>
+        </div>
+        <table class="edit-table" style="margin:0"><thead><tr><th>Libellé / Nature</th><th>Compte</th><th>Montant</th><th></th></tr></thead><tbody>
+        ${d.ventils.map((v,vi)=>`<tr>
+          <td><input ${ic} type="text" value="${v.libelle||''}" placeholder="ex. Carburant..." onchange="window._editData.deps[${di}].ventils[${vi}].libelle=this.value" ${eb}></td>
+          <td><input ${ic} type="text" value="${v.compte||''}" style="font-family:monospace;font-size:12px" placeholder="60xxxxxx" onchange="window._editData.deps[${di}].ventils[${vi}].compte=this.value" ${eb}></td>
+          <td><input ${ic} type="number" style="text-align:right" value="${v.montant||0}" onchange="window._editData.deps[${di}].ventils[${vi}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
+          <td><button class="edit-del-btn" onclick="if(window._editData.deps[${di}].ventils.length>1){window._editData.deps[${di}].ventils.splice(${vi},1);window._renderEditModal()}" ${d.ventils.length<=1?'disabled':''}>×</button></td>
+        </tr>`).join('')}
+        </tbody></table>
+        <div style="padding:4px 10px 8px"><button class="edit-add-btn" style="margin:0" onclick="window._editData.deps[${di}].ventils.push({libelle:'',compte:'',montant:0});window._renderEditModal()">+ Autre nature sur ce ticket</button></div>
+      </div>`;
+    }).join('')}
+    <button class="edit-add-btn" onclick="window._editData.deps.push({date:'',fournisseur:'',ventils:[{libelle:'',compte:'',montant:0}],justificatif_url:''});window._renderEditModal()">+ Ajouter une dépense</button></div>`;
 
   const to=v=>`<option value="participation" ${v!=='cotisation'?'selected':''}>Participation</option><option value="cotisation" ${v==='cotisation'?'selected':''}>Adhésion</option>`;
   const partHtml=`<div class="edit-section"><div class="edit-section-title est-green">Participations / Adhésions (${e.parts.length})</div>
-    <table class="edit-table"><thead><tr><th>Libellé</th><th>Type</th><th>Montant</th><th></th></tr></thead><tbody>
+    <table class="edit-table"><thead><tr><th>Libellé</th><th>Type</th><th>Compte</th><th>Montant</th><th></th></tr></thead><tbody>
     ${e.parts.map((p,i)=>`<tr>
       <td><input ${ic} type="text" value="${p.libelle||''}" onchange="window._editData.parts[${i}].libelle=this.value" ${eb}></td>
       <td><select class="edit-inp" style="width:auto" onchange="window._editData.parts[${i}].type=this.value">${to(p.type)}</select></td>
+      <td><input ${ic} type="text" value="${p.compte||''}" style="font-family:monospace;font-size:12px" placeholder="7xxxxxxx" onchange="window._editData.parts[${i}].compte=this.value" ${eb}></td>
       <td><input ${ic} type="number" style="text-align:right" value="${p.montant||0}" onchange="window._editData.parts[${i}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
       <td><button class="edit-del-btn" onclick="window._editData.parts.splice(${i},1);window._renderEditModal()">×</button></td>
     </tr>`).join('')}
     </tbody></table>
-    <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0});window._renderEditModal()">+ Ajouter une ligne</button></div>`;
+    <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0,compte:''});window._renderEditModal()">+ Ajouter une ligne</button></div>`;
 
   // Comptage section
   const eb2=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;
@@ -1402,7 +1436,7 @@ window.sauvegarderEditCaisse=async function(){
   if(btn){btn.disabled=true;btn.textContent='Enregistrement...';}
   try{
     const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
-    const td=e.deps.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+    const td=e.deps.reduce((s,d)=>s+d.ventils.reduce((sv,v)=>sv+(parseFloat(v.montant)||0),0),0);
     const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
     const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
     const snap={
@@ -1411,11 +1445,11 @@ window.sauvegarderEditCaisse=async function(){
       avances:e.avances.map((a,i)=>({id:i+1,date:a.date,montant:parseFloat(a.montant)||0})),
       deps:e.deps.map((d,i)=>({
         id:i+1,date:d.date,fournisseur:d.fournisseur,
-        ventils:[{id:(i+1)*100,cat:{label:d.categorie||'Autres',compte:d.compte||'Autres',icon:CATS_ICONS[d.categorie]||'📦'},montant:parseFloat(d.montant)||0}],
-        files:[],justificatif_url:currentDeps[i]?.justificatif_url||''
+        ventils:d.ventils.map((v,j)=>({id:(i+1)*100+j,cat:{label:v.libelle||'Autres',compte:v.compte||'',icon:CATS_ICONS[v.libelle]||'📦'},montant:parseFloat(v.montant)||0})),
+        files:[],justificatif_url:d.justificatif_url||''
       })),
       parts:e.parts.map((p,i)=>({
-        id:i+1,libelle:p.libelle,type:p.type,montant:parseFloat(p.montant)||0,
+        id:i+1,libelle:p.libelle,type:p.type,montant:parseFloat(p.montant)||0,compte:p.compte||'',
         files:[],justificatif_url:currentParts[i]?.justificatif_url||''
       })),
       is_snapshot:true,send_count:currentCaisse.donnees_brouillon?.send_count||1,comptable_modifie:true
@@ -1433,7 +1467,7 @@ window.sauvegarderEditCaisse=async function(){
     currentCaisse.total_participations=Math.round(tp*100)/100;currentCaisse.solde_cloture=solde;
     currentCaisse.comptage=newComptage;currentCaisse.donnees_brouillon=snap;
     currentAvances=snap.avances.map(a=>({...a,date_avance:a.date}));
-    currentDeps=snap.deps.map(d=>({...d,date_depense:d.date,categorie:d.ventils.map(v=>v.cat?.label||'').join(', '),montant:d.ventils.reduce((s,v)=>s+(v.montant||0),0)}));
+    currentDeps=snap.deps.map(d=>({...d,date_depense:d.date,categorie:d.ventils.map(v=>v.cat?.label||'').join(', '),compte:d.ventils.map(v=>v.cat?.compte||'').join(', '),montant:d.ventils.reduce((s,v)=>s+(v.montant||0),0)}));
     currentParts=snap.parts.map(p=>({...p}));
     window.fermerEditCaisse();
     renderKpiGrid();
