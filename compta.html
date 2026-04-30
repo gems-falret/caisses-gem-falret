@@ -600,6 +600,9 @@ function renderTabResume(){
   const statutBadge=c.statut==='valide'?'<span class="badge b-ok">✓ Validé</span>':c.statut==='anomalie'?'<span class="badge b-err">⚠ Anomalie</span>':'<span class="badge b-warn">À vérifier</span>';
   const justifBadge=c.statut_justificatifs==='complets'?'<span class="badge b-ok">Complets</span>':c.statut_justificatifs==='incomplets'?'<span class="badge b-warn">Incomplets</span>':'<span class="badge b-err">Manquants</span>';
   const nDepsOk=currentDeps.filter(d=>d.justificatif_url&&d.justificatif_url.length>0).length;
+  const nPartsOk=currentParts.filter(p=>p.justificatif_url&&p.justificatif_url.length>0).length;
+  const nJustifOk=nDepsOk+nPartsOk;
+  const nJustifTotal=currentDeps.length+currentParts.length;
 
   const isBrouillon=c.statut_saisie==='brouillon';
   el.innerHTML=`
@@ -612,7 +615,7 @@ function renderTabResume(){
         <div class="info-cell"><div class="info-cell-label">Mois</div><div class="info-cell-val">${moisNom()}</div></div>
         <div class="info-cell"><div class="info-cell-label">Dossier / Analytique</div><div class="info-cell-val">${c.dossier||'—'} — ${cfg.anal||'—'}</div></div>
         <div class="info-cell"><div class="info-cell-label">Statut saisie</div><div class="info-cell-val">${isBrouillon?'<span class="badge b-warn">Brouillon</span>':'<span class="badge b-ok">Envoyé</span>'}</div></div>
-        <div class="info-cell"><div class="info-cell-label">Justificatifs</div><div class="info-cell-val">${justifBadge} <span style="font-size:12px;color:#888">${nDepsOk}/${currentDeps.length} dép.</span></div></div>
+        <div class="info-cell"><div class="info-cell-label">Justificatifs</div><div class="info-cell-val">${justifBadge} <span style="font-size:12px;color:#888">${nJustifOk}/${nJustifTotal} (${nDepsOk} dép. + ${nPartsOk} part.)</span></div></div>
       </div>
       ${c.notes?`<div class="section-label">Observations du GEM</div><div class="obs-bloc">${c.notes}</div>`:''}
     </div>
