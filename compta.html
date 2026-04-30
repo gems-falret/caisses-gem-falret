@@ -534,7 +534,7 @@ function renderKpiGrid(){
     <div class="kpi"><div class="kpi-label">Solde ouverture</div><div class="kpi-val">${fmt(c.solde_ouverture)} €</div></div>
     <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Avances reçues</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
     <div class="kpi" style="border-color:#fecaca"><div class="kpi-label">Total dépenses</div><div class="kpi-val" style="color:#dc2626">-${fmt(c.total_depenses)} €</div></div>
-    <div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations / Cotisations</div><div class="kpi-val" style="color:#059669">+${fmt(tPartCotis)} €</div></div>
+    <div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations / Adhésions</div><div class="kpi-val" style="color:#059669">+${fmt(tPartCotis)} €</div></div>
     <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde théorique</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
     <div class="kpi" style="border-color:#e5e7eb"><div class="kpi-label">Comptage caisse</div><div class="kpi-val" style="color:#1a1a1a">${tc!==null?fmt(tc)+' €':'—'}</div></div>
     <div class="kpi" style="border-color:${ecartColor};background:${ecart!==null&&Math.abs(ecart)<0.01?'#f0fdf4':ecart!==null&&ecart>0?'#fefce8':ecart!==null?'#fff5f5':'white'}">
@@ -705,7 +705,7 @@ function renderTabParticipations(){
       <div class="cotis-card-header">
         <div class="cotis-num">${idx}</div>
         <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#92400e">${p.libelle||'—'}</div>
-        <div style="font-size:11px;color:#b45309;margin-top:1px">Compte 75600000 — Cotisation adhérent</div></div>
+        <div style="font-size:11px;color:#b45309;margin-top:1px">Compte 75600000 — Adhésion adhérent</div></div>
         <span style="font-size:15px;font-weight:700;color:#d97706">+${fmt(p.montant)} €</span>
       </div>
       <div class="part-card-body">
@@ -721,12 +721,12 @@ function renderTabParticipations(){
     html+=`<div class="total-row" style="background:#d1fae5;margin-bottom:${cotisations.length?'1.5rem':'.25rem'}"><span>Total participations</span><span style="color:#059669;font-weight:700">+${fmt(tPart)} €</span></div>`;
   }
   if(cotisations.length){
-    html+=`<div style="font-size:11px;font-weight:700;color:#d97706;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.75rem;display:flex;align-items:center;gap:8px"><span style="width:28px;height:2px;background:#fbbf24;display:inline-block"></span>Cotisations adhérents (${cotisations.length})</div>`;
+    html+=`<div style="font-size:11px;font-weight:700;color:#d97706;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.75rem;display:flex;align-items:center;gap:8px"><span style="width:28px;height:2px;background:#fbbf24;display:inline-block"></span>Adhésions adhérents (${cotisations.length})</div>`;
     html+=cotisations.map((p,i)=>cardCotis(p,i+1)).join('');
-    html+=`<div class="total-row" style="background:#fef3c7"><span>Total cotisations</span><span style="color:#d97706;font-weight:700">+${fmt(tCotis)} €</span></div>`;
+    html+=`<div class="total-row" style="background:#fef3c7"><span>Total adhésions</span><span style="color:#d97706;font-weight:700">+${fmt(tCotis)} €</span></div>`;
   }
   if(participations.length&&cotisations.length){
-    html+=`<div class="total-row" style="background:#f0fdf4;margin-top:.75rem;font-size:15px;border:1px solid #6ee7b7"><span style="font-size:15px">Total général participations + cotisations</span><span style="color:#059669;font-size:16px;font-weight:700">+${fmt(tPart+tCotis)} €</span></div>`;
+    html+=`<div class="total-row" style="background:#f0fdf4;margin-top:.75rem;font-size:15px;border:1px solid #6ee7b7"><span style="font-size:15px">Total général participations + adhésions</span><span style="color:#059669;font-size:16px;font-weight:700">+${fmt(tPart+tCotis)} €</span></div>`;
   }
   html+='</div>';
   el.innerHTML=html;
@@ -824,7 +824,7 @@ function renderTabEcriture(){
     const tPart=parts.filter(p=>!p.type||p.type==='participation').reduce((s,p)=>s+(p.montant||0),0);
     const tCotis=parts.filter(p=>p.type==='cotisation').reduce((s,p)=>s+(p.montant||0),0);
     if(tPart>0)rows.push({compte:'70820000',anal:cfg.anal||'',lib:'PARTICIPATIONS ADHERENTS',debit:0,credit:Math.round(tPart*100)/100,adj:false});
-    if(tCotis>0)rows.push({compte:'75600000',anal:cfg.anal||'',lib:'COTISATIONS ADHERENTS',debit:0,credit:Math.round(tCotis*100)/100,adj:false});
+    if(tCotis>0)rows.push({compte:'75600000',anal:cfg.anal||'',lib:'ADHESIONS ADHERENTS',debit:0,credit:Math.round(tCotis*100)/100,adj:false});
     (adjustments[c.id]||[]).forEach(a=>rows.push({...a,adj:true}));
     const tD=rows.reduce((s,r)=>s+r.debit,0),tC=rows.reduce((s,r)=>s+r.credit,0);
     rows.push({compte:cfg.compte||'531XXXXX',anal:cfg.anal||'',lib:`CAISSE ${c.gem.toUpperCase()} ${ref}`,debit:0,credit:Math.round((tD-tC)*100)/100,last:true});
@@ -857,7 +857,7 @@ function renderTabEcriture(){
         ?`<td style="padding:6px 10px;border:1px solid #eee;vertical-align:top">
             <div style="font-size:10px;color:#888">${it.date||'—'}</div>
             <div style="font-size:12px;margin:1px 0;white-space:nowrap">${it.fournisseur}</div>
-            <div style="font-size:12px;font-weight:700;color:#dc2626;text-align:right">${fmt(it.montant)} €</div>
+            <div style="font-size:12px;font-weight:600;color:#1a1a1a;text-align:right">${fmt(it.montant)} €</div>
           </td>`
         :`<td style="border:1px solid #eee;background:#fafafa"></td>`;}).join('')}</tr>`;
     }
@@ -871,7 +871,7 @@ function renderTabEcriture(){
             <div style="font-size:10px;color:#888;font-family:monospace;margin-top:2px">${data.compte}</div>
           </th>`).join('')}</tr></thead>
           <tbody>${tableRows}</tbody>
-          <tfoot><tr>${catEntries.map(([,data])=>`<td style="padding:8px 10px;border:1px solid #fca5a5;background:#fff5f5;font-weight:700;color:#dc2626;text-align:right;font-size:13px">
+          <tfoot><tr>${catEntries.map(([,data])=>`<td style="padding:8px 10px;border:1px solid #fca5a5;background:#f5f5f5;font-weight:800;color:#1a1a1a;text-align:right;font-size:13px">
             Total : ${fmt(data.items.reduce((s,it)=>s+it.montant,0))} €
           </td>`).join('')}</tr></tfoot>
         </table>
@@ -1028,7 +1028,7 @@ window.telechargerCaissePdf=async function(){
         ['Solde d\'ouverture',`${fmt(c.solde_ouverture)} EUR`],
         ['Avances recues',`+${fmt(c.total_avances)} EUR`],
         ['Total depenses',`-${fmt(c.total_depenses)} EUR`],
-        ['Participations / Cotisations',`+${fmt(c.total_participations)} EUR`],
+        ['Participations / Adhésions',`+${fmt(c.total_participations)} EUR`],
         ['Solde theorique de cloture',`${fmt(c.solde_cloture)} EUR`],
         ['Comptage physique',tc!==null?`${fmt(tc)} EUR`:'Non disponible'],
         ['Ecart caisse',ecartTxt],
@@ -1090,7 +1090,7 @@ window.telechargerCaissePdf=async function(){
     if(currentParts.length){
       if(y>240){doc.addPage();y=20;}
       doc.setTextColor(5,150,105);doc.setFontSize(11);doc.setFont(undefined,'bold');
-      doc.text(`Participations & Cotisations (${currentParts.length})`,14,y);y+=1;
+      doc.text(`Participations & Adhésions (${currentParts.length})`,14,y);y+=1;
       doc.setDrawColor(5,150,105);doc.line(14,y,196,y);y+=3;
       const partBody=currentParts.map(p=>[p.libelle||'-',p.type==='cotisation'?'Cotisation':'Participation',`+${fmt(p.montant)} EUR`]);
       partBody.push(['Total','',`+${fmt(currentParts.reduce((s,p)=>s+(p.montant||0),0))} EUR`]);

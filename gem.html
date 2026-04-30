@@ -309,12 +309,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
     </div>
     <div style="border-left:3px solid #1D9E75;background:#E1F5EE;border-radius:0 12px 12px 0;padding:1rem 1.25rem;margin-bottom:1rem">
-      <p class="card-title" style="color:#0F6E56">Participations / Cotisations adhérents</p>
-      <p class="card-sub">Ajoute chaque participation ou cotisation avec son libellé et son justificatif.</p>
+      <p class="card-title" style="color:#0F6E56">Participations / Adhésions adhérents</p>
+      <p class="card-sub">Ajoute chaque participation ou adhésion avec son libellé et son justificatif.</p>
       <div id="part-list"></div>
-      <button class="add-btn" id="btn-add-part" onclick="window.ajouterPart()">+ Ajouter une participation / cotisation</button>
+      <button class="add-btn" id="btn-add-part" onclick="window.ajouterPart()">+ Ajouter une participation / adhésion</button>
       <div class="total-row">
-        <span style="font-size:14px;font-weight:600">Total participations / cotisations</span>
+        <span style="font-size:14px;font-weight:600">Total participations / adhésions</span>
         <span style="font-size:16px;font-weight:600;color:#16a34a" id="total-part">0,00 €</span>
       </div>
     </div>
@@ -546,7 +546,7 @@ async function ouvrirCompteRendu(moisStr){
     <div class="cr-row"><span style="color:#888">Solde ouverture</span><span>${(c.solde_ouverture||0).toFixed(2).replace('.',',')} €</span></div>
     <div class="cr-row"><span style="color:#888">Total avances</span><span style="color:#16a34a">+${(c.total_avances||0).toFixed(2).replace('.',',')} €</span></div>
     <div class="cr-row"><span style="color:#888">Total dépenses</span><span style="color:#dc2626">-${(c.total_depenses||0).toFixed(2).replace('.',',')} €</span></div>
-    <div class="cr-row"><span style="color:#888">Total participations/cotisations</span><span style="color:#16a34a">+${(c.total_participations||0).toFixed(2).replace('.',',')} €</span></div>
+    <div class="cr-row"><span style="color:#888">Total participations/adhésions</span><span style="color:#16a34a">+${(c.total_participations||0).toFixed(2).replace('.',',')} €</span></div>
     <div class="cr-row" style="border-top:2px solid #eee;padding-top:10px;margin-top:4px"><span style="font-weight:600">Solde théorique clôture</span><span style="font-weight:700;font-size:16px">${(c.solde_cloture||0).toFixed(2).replace('.',',')} €</span></div>
     ${totalCpt!==null?`
     <div class="cr-row" style="padding-top:6px"><span style="color:#888">Comptage physique</span><span style="font-weight:600">${totalCpt.toFixed(2).replace('.',',')} €</span></div>
@@ -594,7 +594,7 @@ async function ouvrirCompteRendu(moisStr){
     }
 
     if(cotisations.length){
-      html+=`<div class="cr-section"><div class="cr-section-title" style="color:#854d0e">Cotisations adhérents (${cotisations.length})</div>`;
+      html+=`<div class="cr-section"><div class="cr-section-title" style="color:#854d0e">Adhésions adhérents (${cotisations.length})</div>`;
       cotisations.forEach(p=>{
         const justifUrls=p.justificatif_url?p.justificatif_url.split(',').filter(u=>u.trim()):[];
         html+=`<div class="cr-dep" style="border-left:3px solid #fde047">
@@ -606,7 +606,7 @@ async function ouvrirCompteRendu(moisStr){
     }
 
     if(participations.length||cotisations.length){
-      html+=`<div class="cr-section"><div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total participations/cotisations</span><span style="color:#16a34a;font-weight:600">+${finalParts.reduce((s,p)=>s+(p.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
+      html+=`<div class="cr-section"><div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total participations/adhésions</span><span style="color:#16a34a;font-weight:600">+${finalParts.reduce((s,p)=>s+(p.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
     }
   }
 
@@ -674,7 +674,7 @@ window.telechargerCaisseGemPdf=async function(){
         ['Solde d\'ouverture',`${f(c.solde_ouverture)} EUR`],
         ['Avances recues',`+${f(c.total_avances)} EUR`],
         ['Total depenses',`-${f(c.total_depenses)} EUR`],
-        ['Participations / Cotisations',`+${f(c.total_participations)} EUR`],
+        ['Participations / Adhésions',`+${f(c.total_participations)} EUR`],
         ['Solde theorique de cloture',`${f(c.solde_cloture)} EUR`],
         ['Comptage physique',totalCpt!==null?`${f(totalCpt)} EUR`:'Non disponible'],
         ['Ecart caisse',ecartTxt],
@@ -726,7 +726,7 @@ window.telechargerCaisseGemPdf=async function(){
     if(finalParts.length){
       if(y>240){doc.addPage();y=20;}
       doc.setTextColor(5,150,105);doc.setFontSize(11);doc.setFont(undefined,'bold');
-      doc.text(`Participations et Cotisations (${finalParts.length})`,14,y);y+=1;
+      doc.text(`Participations et Adhésions (${finalParts.length})`,14,y);y+=1;
       doc.setDrawColor(5,150,105);doc.line(14,y,196,y);y+=3;
       const pRows=finalParts.map(p=>[p.libelle||'-',p.type==='cotisation'?'Cotisation':'Participation',`+${f(p.montant)} EUR`]);
       pRows.push(['Total','',`+${f(finalParts.reduce((s,p)=>s+(p.montant||0),0))} EUR`]);
@@ -1116,7 +1116,7 @@ function renderParts(){
         <div class="field"><label>Type</label>
           <select onchange="window.updatePartType(${p.id},this.value)" style="font-size:12px;padding:6px 8px">
             <option value="participation" ${!isCotisation?'selected':''}>Participation</option>
-            <option value="cotisation" ${isCotisation?'selected':''}>Cotisation</option>
+            <option value="cotisation" ${isCotisation?'selected':''}>Adhésion</option>
           </select>
         </div>
       </div>
@@ -1223,10 +1223,10 @@ function buildRecap(){
     const hasJustif=(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0;
     html+=`<div class="recap-sub"><span>${i+1}. ${d.fournisseur||'—'}${d.date?' ('+d.date+')':''} — ${cats||'Non catégorisé'}</span><span>${depTotal(d).toFixed(2).replace('.',',')} € ${hasJustif?'✅':'⚠️'}</span></div>`;
   });
-  html+=`<div class="recap-row" style="margin-top:4px"><span style="color:#888">Total participations/cotisations</span><span style="color:#16a34a;font-weight:600">+${tp.toFixed(2).replace('.',',')} €</span></div>`;
+  html+=`<div class="recap-row" style="margin-top:4px"><span style="color:#888">Total participations/adhésions</span><span style="color:#16a34a;font-weight:600">+${tp.toFixed(2).replace('.',',')} €</span></div>`;
   parts.forEach((p,i)=>{
     const hasJustif=(p.justificatif_url&&p.justificatif_url.length>0)||p.files?.length>0;
-    const badge=p.type==='cotisation'?'<span class="type-badge type-cotisation">Cotisation</span>':'<span class="type-badge type-participation">Participation</span>';
+    const badge=p.type==='cotisation'?'<span class="type-badge type-cotisation">Adhésion</span>':'<span class="type-badge type-participation">Participation</span>';
     html+=`<div class="recap-sub"><span>${i+1}. ${p.libelle||'—'} ${badge}</span><span>${(p.montant||0).toFixed(2).replace('.',',')} € ${hasJustif?'✅':'⚠️'}</span></div>`;
   });
   const soldeEstime=Math.round((soldePrecedent+ta+tp-td)*100)/100;
@@ -1288,6 +1288,8 @@ async function envoyerCaisse(){
   let caisseId=null;
   try{
     if(caisseCourante){
+      // RE-ENVOI : mise à jour du snapshot uniquement — pas de manipulation des tables
+      // (le DELETE échoue silencieusement à cause des RLS, ce qui crée des doublons)
       const{error:upErr}=await supabase.from('caisses').update({
         responsable:resp,solde_ouverture:soldePrecedent,
         total_depenses:td,total_participations:tp,total_avances:ta,
@@ -1296,11 +1298,9 @@ async function envoyerCaisse(){
         donnees_brouillon:snapshotEnvoi,notes:observations,comptage:comptageActuel
       }).eq('id',caisseCourante.id);
       if(upErr)throw upErr;
-      await supabase.from('depenses').delete().eq('caisse_id',caisseCourante.id);
-      await supabase.from('participations').delete().eq('caisse_id',caisseCourante.id);
-      await supabase.from('avances').delete().eq('caisse_id',caisseCourante.id);
       caisseId=caisseCourante.id;
     } else {
+      // PREMIER ENVOI : insertion complète dans toutes les tables
       const{data,error}=await supabase.from('caisses').insert({
         gem:USER.gem,dossier:USER.dossier,mois,responsable:resp,
         solde_ouverture:soldePrecedent,total_depenses:td,
@@ -1311,29 +1311,29 @@ async function envoyerCaisse(){
       }).select().single();
       if(error)throw error;
       caisseId=data.id;
-    }
-    for(const d of deps){
-      const newUrls=await uploadFiles(d.files||[],`${USER.gem}/${mois}/depenses`);
-      const existingUrls=(d.justificatif_url||'').split(',').filter(u=>u.trim());
-      const allUrls=[...existingUrls,...newUrls];
-      await supabase.from('depenses').insert({
-        caisse_id:caisseId,date_depense:d.date||null,fournisseur:d.fournisseur,
-        categorie:d.ventils.map(v=>v.cat?v.cat.label:'—').join(', '),
-        compte:d.ventils.map(v=>v.cat?v.cat.compte:'—').join(', '),
-        montant:depTotal(d),justificatif_url:allUrls.join(',')
-      });
-    }
-    for(const p of parts){
-      const newUrls=await uploadFiles(p.files||[],`${USER.gem}/${mois}/participations`);
-      const existingUrls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
-      const allUrls=[...existingUrls,...newUrls];
-      await supabase.from('participations').insert({
-        caisse_id:caisseId,libelle:p.libelle,montant:p.montant||0,
-        type:p.type||'participation',justificatif_url:allUrls.join(',')
-      });
-    }
-    for(const a of avances){
-      await supabase.from('avances').insert({caisse_id:caisseId,date_avance:a.date||null,montant:a.montant||0});
+      for(const d of deps){
+        const newUrls=await uploadFiles(d.files||[],`${USER.gem}/${mois}/depenses`);
+        const existingUrls=(d.justificatif_url||'').split(',').filter(u=>u.trim());
+        const allUrls=[...existingUrls,...newUrls];
+        await supabase.from('depenses').insert({
+          caisse_id:caisseId,date_depense:d.date||null,fournisseur:d.fournisseur,
+          categorie:d.ventils.map(v=>v.cat?v.cat.label:'—').join(', '),
+          compte:d.ventils.map(v=>v.cat?v.cat.compte:'—').join(', '),
+          montant:depTotal(d),justificatif_url:allUrls.join(',')
+        });
+      }
+      for(const p of parts){
+        const newUrls=await uploadFiles(p.files||[],`${USER.gem}/${mois}/participations`);
+        const existingUrls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
+        const allUrls=[...existingUrls,...newUrls];
+        await supabase.from('participations').insert({
+          caisse_id:caisseId,libelle:p.libelle,montant:p.montant||0,
+          type:p.type||'participation',justificatif_url:allUrls.join(',')
+        });
+      }
+      for(const a of avances){
+        await supabase.from('avances').insert({caisse_id:caisseId,date_avance:a.date||null,montant:a.montant||0});
+      }
     }
     // Vérifier que la caisse est bien visible en base
     const{data:verif}=await supabase.from('caisses').select('statut_saisie').eq('id',caisseId).single();
