@@ -610,10 +610,14 @@ async function ouvrirCompteRendu(moisStr){
     }
   }
 
-  html+=`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;display:flex;gap:8px">
+  html+=`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn" style="flex:1" onclick="window.fermerCR()">Fermer</button>
+    <button class="btn" style="flex:1;background:#f0fdf4;border-color:#6ee7b7;color:#059669;font-weight:600" onclick="window.telechargerCaisseGemPdf()">📄 Télécharger PDF</button>
     ${!estValide?`<button class="btn btn-primary" style="flex:1" onclick="window.fermerCRModifier('${moisStr}')">✏️ Modifier cette caisse</button>`:''}
   </div>`;
+
+  // Stocker les données pour le PDF
+  window._gemCrData={c,finalDeps,finalParts,finalAvances,moisStr};
 
   document.getElementById('modal-cr-content').innerHTML=html;
 }
@@ -623,6 +627,126 @@ function nomFichier(url){
   const idx=base.indexOf('_');
   return idx>=0?base.slice(idx+1):base;
 }
+
+window.telechargerCaisseGemPdf=async function(){
+  const d=window._gemCrData;if(!d)return;
+  const {c,finalDeps,finalParts,finalAvances,moisStr}=d;
+  const btn=event?.target;if(btn){btn.disabled=true;btn.textContent='...';}
+  try{
+    if(!window.jspdf){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+    }
+    if(!window.jspdf?.jsPDF?.prototype?.autoTable){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+    }
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+    const moisIdx=parseInt(moisStr.split('-')[1])-1;
+    const moisNomStr=MOIS_LONGS[moisIdx]+' '+moisStr.split('-')[0];
+    const f=n=>(n||0).toFixed(2).replace('.',',');
+
+    // En-tete
+    doc.setFillColor(22,73,184);doc.rect(0,0,210,22,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(15);doc.setFont(undefined,'bold');
+    doc.text(`Caisse GEM - ${c.gem||USER.gem}`,14,10);
+    doc.setFontSize(9);doc.setFont(undefined,'normal');
+    doc.text(`${moisNomStr}  |  Responsable : ${c.responsable||'-'}  |  Dossier : ${c.dossier||USER.dossier||'-'}`,14,17);
+
+    let y=28;
+
+    // Calcul comptage
+    let totalCpt=null;
+    if(c.comptage){
+      let t=0;
+      BILLETS.forEach(v=>{t+=v*(c.comptage.billets?.[String(v)]||0);});
+      PIECES.forEach(v=>{t=Math.round((t+v*(c.comptage.pieces?.[String(v)]||0))*100)/100;});
+      totalCpt=Math.round(t*100)/100;
+    }
+    const ecartVal=totalCpt!==null?Math.round((totalCpt-(c.solde_cloture||0))*100)/100:null;
+    const ecartTxt=ecartVal===null?'Non disponible':Math.abs(ecartVal)<0.01?'Conforme':(ecartVal>0?'+':'')+f(ecartVal)+' EUR';
+
+    // Resume financier
+    doc.setTextColor(22,73,184);doc.setFontSize(11);doc.setFont(undefined,'bold');
+    doc.text('Resume financier',14,y);y+=1;
+    doc.setDrawColor(22,73,184);doc.setLineWidth(0.5);doc.line(14,y,196,y);y+=3;
+    doc.autoTable({startY:y,margin:{left:14,right:14},
+      body:[
+        ['Solde d\'ouverture',`${f(c.solde_ouverture)} EUR`],
+        ['Avances recues',`+${f(c.total_avances)} EUR`],
+        ['Total depenses',`-${f(c.total_depenses)} EUR`],
+        ['Participations / Cotisations',`+${f(c.total_participations)} EUR`],
+        ['Solde theorique de cloture',`${f(c.solde_cloture)} EUR`],
+        ['Comptage physique',totalCpt!==null?`${f(totalCpt)} EUR`:'Non disponible'],
+        ['Ecart caisse',ecartTxt],
+      ],
+      styles:{fontSize:9,cellPadding:2.5},
+      columnStyles:{0:{cellWidth:130,textColor:[80,80,80]},1:{cellWidth:52,halign:'right',fontStyle:'bold'}},
+      theme:'plain',
+      didParseCell:d=>{
+        if(d.row.index===4){d.cell.styles.textColor=[22,73,184];d.cell.styles.fontStyle='bold';}
+        if(d.row.index===6){d.cell.styles.textColor=ecartVal===null?[120,120,120]:Math.abs(ecartVal)<0.01?[22,163,74]:ecartVal>0?[133,77,14]:[220,38,38];d.cell.styles.fontStyle='bold';}
+      }
+    });
+    y=doc.lastAutoTable.finalY+8;
+
+    // Avances
+    if(finalAvances.length){
+      if(y>250){doc.addPage();y=20;}
+      doc.setTextColor(22,163,74);doc.setFontSize(11);doc.setFont(undefined,'bold');
+      doc.text(`Avances recues (${finalAvances.length})`,14,y);y+=1;
+      doc.setDrawColor(22,163,74);doc.line(14,y,196,y);y+=3;
+      doc.autoTable({startY:y,margin:{left:14,right:14},
+        head:[['Date','Montant']],
+        body:[...finalAvances.map(a=>[a.date_avance||a.date||'-',`+${f(a.montant)} EUR`]),['Total',`+${f(finalAvances.reduce((s,a)=>s+(a.montant||0),0))} EUR`]],
+        styles:{fontSize:9},headStyles:{fillColor:[220,252,231],textColor:[6,78,59],fontStyle:'bold'},
+        columnStyles:{1:{halign:'right',fontStyle:'bold'}},theme:'grid'});
+      y=doc.lastAutoTable.finalY+8;
+    }
+
+    // Depenses
+    if(finalDeps.length){
+      if(y>230){doc.addPage();y=20;}
+      doc.setTextColor(192,80,94);doc.setFontSize(11);doc.setFont(undefined,'bold');
+      doc.text(`Depenses (${finalDeps.length})`,14,y);y+=1;
+      doc.setDrawColor(192,80,94);doc.line(14,y,196,y);y+=3;
+      const rows=finalDeps.map(dep=>{
+        const cats=dep.categorie||(dep.ventils?.filter(v=>v.cat).map(v=>v.cat.label).join(' + '))||'-';
+        return[dep.date_depense||dep.date||'-',dep.fournisseur||'-',cats,`${f(dep.montant||(dep.ventils||[]).reduce((s,v)=>s+(v.montant||0),0))} EUR`];
+      });
+      rows.push(['Total','','',`-${f(finalDeps.reduce((s,dep)=>s+(dep.montant||(dep.ventils||[]).reduce((sv,v)=>sv+(v.montant||0),0)),0))} EUR`]);
+      doc.autoTable({startY:y,margin:{left:14,right:14},
+        head:[['Date','Fournisseur','Type de depense','Montant']],body:rows,
+        styles:{fontSize:8.5,cellPadding:2},
+        headStyles:{fillColor:[254,246,246],textColor:[153,50,50],fontStyle:'bold'},
+        columnStyles:{0:{cellWidth:22},3:{halign:'right',cellWidth:22}},theme:'grid'});
+      y=doc.lastAutoTable.finalY+8;
+    }
+
+    // Participations
+    if(finalParts.length){
+      if(y>240){doc.addPage();y=20;}
+      doc.setTextColor(5,150,105);doc.setFontSize(11);doc.setFont(undefined,'bold');
+      doc.text(`Participations et Cotisations (${finalParts.length})`,14,y);y+=1;
+      doc.setDrawColor(5,150,105);doc.line(14,y,196,y);y+=3;
+      const pRows=finalParts.map(p=>[p.libelle||'-',p.type==='cotisation'?'Cotisation':'Participation',`+${f(p.montant)} EUR`]);
+      pRows.push(['Total','',`+${f(finalParts.reduce((s,p)=>s+(p.montant||0),0))} EUR`]);
+      doc.autoTable({startY:y,margin:{left:14,right:14},
+        head:[['Libelle','Type','Montant']],body:pRows,
+        styles:{fontSize:9,cellPadding:2.5},
+        headStyles:{fillColor:[209,250,229],textColor:[6,78,59],fontStyle:'bold'},
+        columnStyles:{2:{halign:'right',fontStyle:'bold'}},theme:'grid'});
+    }
+
+    // Pied de page
+    const tot=doc.internal.getNumberOfPages();
+    for(let i=1;i<=tot;i++){
+      doc.setPage(i);doc.setTextColor(160);doc.setFontSize(7.5);doc.setFont(undefined,'normal');
+      doc.text(`Fondation Falret - GEM ${c.gem||USER.gem} - ${moisNomStr} - Page ${i}/${tot}`,14,290);
+    }
+    doc.save(`caisse_${(c.gem||USER.gem).replace(/\s+/g,'_')}_${moisStr}.pdf`);
+  }catch(e){console.error(e);alert('Erreur PDF : '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Telecharger PDF';}}
+};
 window.voirJustif=async function(path){
   const win=window.open('','_blank');
   const{data,error}=await supabase.storage.from('justificatifs').createSignedUrl(path,3600);

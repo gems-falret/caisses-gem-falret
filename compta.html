@@ -510,22 +510,20 @@ function renderKpiGrid(){
   const ecart=tc!==null?Math.round((tc-c.solde_cloture)*100)/100:null;
   const ecartColor=ecart===null?'#888':Math.abs(ecart)<0.01?'#16a34a':ecart>0?'#854d0e':'#dc2626';
   const ecartText=ecart===null?'—':Math.abs(ecart)<0.01?'✓ Conforme':ecart>0?'+'+fmt(ecart)+' €':fmt(ecart)+' €';
-  const tPart=currentParts.filter(p=>!p.type||p.type==='participation').reduce((s,p)=>s+(p.montant||0),0);
-  const tCotis=currentParts.filter(p=>p.type==='cotisation').reduce((s,p)=>s+(p.montant||0),0);
+  const tPartCotis=currentParts.reduce((s,p)=>s+(p.montant||0),0);
   document.getElementById('kpi-grid').innerHTML=`
     <div class="kpi"><div class="kpi-label">Solde ouverture</div><div class="kpi-val">${fmt(c.solde_ouverture)} €</div></div>
     <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Avances reçues</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
     <div class="kpi" style="border-color:#fecaca"><div class="kpi-label">Total dépenses</div><div class="kpi-val" style="color:#dc2626">-${fmt(c.total_depenses)} €</div></div>
-    <div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations</div><div class="kpi-val" style="color:#059669">+${fmt(tPart)} €</div></div>
-    <div class="kpi" style="border-color:#fbbf24"><div class="kpi-label">Cotisations</div><div class="kpi-val" style="color:#d97706">+${fmt(tCotis)} €</div></div>
+    <div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations / Cotisations</div><div class="kpi-val" style="color:#059669">+${fmt(tPartCotis)} €</div></div>
     <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde théorique</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
     <div class="kpi" style="border-color:#e5e7eb"><div class="kpi-label">Comptage caisse</div><div class="kpi-val" style="color:#1a1a1a">${tc!==null?fmt(tc)+' €':'—'}</div></div>
     <div class="kpi" style="border-color:${ecartColor};background:${ecart!==null&&Math.abs(ecart)<0.01?'#f0fdf4':ecart!==null&&ecart>0?'#fefce8':ecart!==null?'#fff5f5':'white'}">
-      <div class="kpi-label">Écart</div>
+      <div class="kpi-label">Ecart</div>
       <div class="kpi-val" style="color:${ecartColor};font-size:15px">${ecartText}</div>
     </div>
   `;
-  document.getElementById('kpi-grid').style.gridTemplateColumns='repeat(8,1fr)';
+  document.getElementById('kpi-grid').style.gridTemplateColumns='repeat(7,1fr)';
 }
 
 window.switchTab=function(name,el){
@@ -1002,18 +1000,19 @@ window.telechargerCaissePdf=async function(){
     // ── Résumé financier ──
     const tc=totalComptage(c);
     const ecart=tc!==null?Math.round((tc-c.solde_cloture)*100)/100:null;
-    const ecartTxt=ecart===null?'—':Math.abs(ecart)<0.01?'✓ Conforme':(ecart>0?'+':'')+fmt(ecart)+' €';
+    const ecartTxt=ecart===null?'Non disponible':Math.abs(ecart)<0.01?'Conforme':(ecart>0?'+':'')+fmt(ecart)+' EUR';
     doc.setTextColor(22,73,184);doc.setFontSize(11);doc.setFont(undefined,'bold');
     doc.text('Résumé financier',14,y);y+=1;
     doc.setDrawColor(22,73,184);doc.setLineWidth(0.5);doc.line(14,y,196,y);y+=3;
     doc.autoTable({startY:y,margin:{left:14,right:14},
       body:[
-        ['Solde d\'ouverture',`${fmt(c.solde_ouverture)} €`],
-        ['Avances reçues',`+${fmt(c.total_avances)} €`],
-        ['Total dépenses',`-${fmt(c.total_depenses)} €`],
-        ['Participations / Cotisations',`+${fmt(c.total_participations)} €`],
-        ['Solde théorique de clôture',`${fmt(c.solde_cloture)} €`],
-        ...(tc!==null?[['Comptage physique',`${fmt(tc)} €`],['Écart',ecartTxt]]:[]),
+        ['Solde d\'ouverture',`${fmt(c.solde_ouverture)} EUR`],
+        ['Avances recues',`+${fmt(c.total_avances)} EUR`],
+        ['Total depenses',`-${fmt(c.total_depenses)} EUR`],
+        ['Participations / Cotisations',`+${fmt(c.total_participations)} EUR`],
+        ['Solde theorique de cloture',`${fmt(c.solde_cloture)} EUR`],
+        ['Comptage physique',tc!==null?`${fmt(tc)} EUR`:'Non disponible'],
+        ['Ecart caisse',ecartTxt],
       ],
       styles:{fontSize:9,cellPadding:2.5},
       columnStyles:{0:{cellWidth:130,textColor:[80,80,80]},1:{cellWidth:52,halign:'right',fontStyle:'bold'}},
@@ -1034,8 +1033,8 @@ window.telechargerCaissePdf=async function(){
       doc.autoTable({startY:y,margin:{left:14,right:14},
         head:[['Date','Montant']],
         body:[
-          ...currentAvances.map(a=>[a.date_avance||'—',`+${fmt(a.montant)} €`]),
-          ['Total',`+${fmt(currentAvances.reduce((s,a)=>s+(a.montant||0),0))} €`]
+          ...currentAvances.map(a=>[a.date_avance||'-',`+${fmt(a.montant)} EUR`]),
+          ['Total',`+${fmt(currentAvances.reduce((s,a)=>s+(a.montant||0),0))} EUR`]
         ],
         styles:{fontSize:9},headStyles:{fillColor:[220,252,231],textColor:[6,78,59],fontStyle:'bold'},
         columnStyles:{1:{halign:'right',fontStyle:'bold'}},
@@ -1054,9 +1053,9 @@ window.telechargerCaissePdf=async function(){
         const cats=d.ventils?.length>0
           ?d.ventils.filter(v=>v.cat).map(v=>`${v.cat.label} (${fmt(v.montant)}€)`).join(' + ')
           :(d.categorie||'—');
-        return[d.date_depense||'—',d.fournisseur||'—',cats,`${fmt(d.montant)} €`];
+        return[d.date_depense||'-',d.fournisseur||'-',cats,`${fmt(d.montant)} EUR`];
       });
-      depBody.push(['Total','','',`-${fmt(currentDeps.reduce((s,d)=>s+(d.montant||0),0))} €`]);
+      depBody.push(['Total','','',`-${fmt(currentDeps.reduce((s,d)=>s+(d.montant||0),0))} EUR`]);
       doc.autoTable({startY:y,margin:{left:14,right:14},
         head:[['Date','Fournisseur','Type de dépense','Montant']],
         body:depBody,
@@ -1074,8 +1073,8 @@ window.telechargerCaissePdf=async function(){
       doc.setTextColor(5,150,105);doc.setFontSize(11);doc.setFont(undefined,'bold');
       doc.text(`Participations & Cotisations (${currentParts.length})`,14,y);y+=1;
       doc.setDrawColor(5,150,105);doc.line(14,y,196,y);y+=3;
-      const partBody=currentParts.map(p=>[p.libelle||'—',p.type==='cotisation'?'Cotisation':'Participation',`+${fmt(p.montant)} €`]);
-      partBody.push(['Total','',`+${fmt(currentParts.reduce((s,p)=>s+(p.montant||0),0))} €`]);
+      const partBody=currentParts.map(p=>[p.libelle||'-',p.type==='cotisation'?'Cotisation':'Participation',`+${fmt(p.montant)} EUR`]);
+      partBody.push(['Total','',`+${fmt(currentParts.reduce((s,p)=>s+(p.montant||0),0))} EUR`]);
       doc.autoTable({startY:y,margin:{left:14,right:14},
         head:[['Libellé','Type','Montant']],
         body:partBody,
