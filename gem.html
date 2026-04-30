@@ -1026,7 +1026,7 @@ function renderDepList(){
       <div class="dep-body">
         <div class="row2">
           <div class="field"><label>Date du ticket</label><input type="date" value="${d.date||''}" onchange="window.updateDepDate(${d.id},this.value)"></div>
-          <div class="field"><label>Fournisseur</label><input type="text" placeholder="ex. Leclerc..." value="${d.fournisseur||''}" onchange="window.updateDepFourn(${d.id},this.value)"></div>
+          <div class="field"><label>Fournisseur</label><input type="text" placeholder="ex. Leclerc..." value="${d.fournisseur||''}" onchange="window.updateDepFourn(${d.id},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"></div>
         </div>
         <label style="font-size:12px;color:#666;display:block;margin-bottom:6px">Catégorie(s) et montant(s)</label>
         ${d.ventils.map(v=>`<div class="ventil-row">
@@ -1034,7 +1034,7 @@ function renderDepList(){
             <option value="">— Catégorie —</option>
             ${CATS.map(c=>`<option value="${c.label}" ${v.cat&&v.cat.label===c.label?'selected':''}>${c.icon} ${c.label}</option>`).join('')}
           </select>
-          <input type="number" placeholder="0,00" min="0" step="0.01" style="width:100%;text-align:right;border:1px solid #e0e0e0;border-radius:8px;padding:5px 8px;font-size:13px" value="${v.montant||''}" onchange="window.updateVentilMontant(${d.id},${v.id},this.value)">
+          <input type="number" placeholder="0,00" min="0" step="0.01" style="width:100%;text-align:right;border:1px solid #e0e0e0;border-radius:8px;padding:5px 8px;font-size:13px" value="${v.montant||''}" onchange="window.updateVentilMontant(${d.id},${v.id},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
           <button onclick="window.suppVentil(${d.id},${v.id})" style="border:none;background:none;color:#aaa;cursor:pointer;font-size:16px"${d.ventils.length<=1?' disabled':''}>×</button>
         </div>`).join('')}
         <button class="add-ventil-btn" onclick="window.ajouterVentil(${d.id})">+ Autre catégorie pour ce ticket</button>
@@ -1108,10 +1108,10 @@ function renderParts(){
     return`<div class="part-row">
       <div class="row3">
         <div class="field"><label>Libellé</label>
-          <input type="text" placeholder="ex. Sortie cinéma..." value="${p.libelle||''}" onchange="window.updatePartLibelle(${p.id},this.value)">
+          <input type="text" placeholder="ex. Sortie cinéma..." value="${p.libelle||''}" onchange="window.updatePartLibelle(${p.id},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
         </div>
         <div class="field"><label>Montant (€)</label>
-          <input type="number" placeholder="0,00" min="0" step="0.01" style="text-align:right" value="${p.montant||''}" onchange="window.updatePartMontant(${p.id},this.value)">
+          <input type="number" placeholder="0,00" min="0" step="0.01" style="text-align:right" value="${p.montant||''}" onchange="window.updatePartMontant(${p.id},this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
         </div>
         <div class="field"><label>Type</label>
           <select onchange="window.updatePartType(${p.id},this.value)" style="font-size:12px;padding:6px 8px">

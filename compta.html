@@ -141,6 +141,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-valider.devalider:hover{background:#b91c1c}
 .empty{text-align:center;color:#aaa;font-size:13px;padding:2rem;font-style:italic}
 .locked-banner{background:#dbeafe;border:1px solid #93c5fd;border-radius:10px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#1d4ed8;display:flex;align-items:center;gap:8px}
+/* ── Éditeur comptable ── */
+.edit-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0}
+.edit-modal-overlay.open{display:flex}
+.edit-modal{background:white;border-radius:18px;padding:1.75rem;width:96%;max-width:1000px;margin:auto}
+.edit-section{margin-bottom:1.5rem}
+.edit-section-title{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.75rem;padding:6px 10px;border-radius:6px;display:flex;align-items:center;gap:8px}
+.est-gray{background:#f5f5f5;color:#555}
+.est-blue{background:#dbeafe;color:#1d4ed8}
+.est-red{background:#fff0f0;color:#b91c1c}
+.est-green{background:#d1fae5;color:#059669}
+.est-amber{background:#fef3c7;color:#d97706}
+.edit-table{width:100%;border-collapse:collapse;font-size:13px}
+.edit-table th{padding:7px 10px;text-align:left;background:#f8f8f8;border-bottom:2px solid #eee;font-size:11px;font-weight:600;color:#555;text-transform:uppercase;white-space:nowrap}
+.edit-table td{padding:5px 6px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.edit-table tr:last-child td{border-bottom:none}
+.edit-inp{width:100%;border:1px solid #e0e0e0;border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;background:white;outline:none}
+.edit-inp:focus{border-color:#1649b8;box-shadow:0 0 0 2px rgba(22,73,184,0.1)}
+.edit-add-btn{margin-top:.5rem;padding:6px 12px;border:1.5px dashed #ddd;border-radius:8px;background:none;color:#888;font-size:12px;cursor:pointer;font-family:inherit}
+.edit-del-btn{border:none;background:none;color:#dc2626;cursor:pointer;font-size:18px;padding:0 4px;line-height:1}
+.edit-summary{background:#f8fafc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;border:1px solid #e2e8f0}
+.edit-sum-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#555}
+.edit-sum-total{display:flex;justify-content:space-between;padding:8px 0 0;border-top:2px solid #1649b8;margin-top:6px;font-size:15px;font-weight:700;color:#1649b8}
+.btn-save-edit{background:#059669;color:white;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-save-edit:hover{background:#047857}
 </style>
 </head>
 <body>
@@ -914,20 +938,24 @@ function renderTabEcriture(){
         <div class="card-title" style="margin-bottom:1rem">Ajustements manuels</div>
         <div class="adj-block">
           ${adj.map((a,i)=>`<div class="adj-row">
-            <input class="adj-inp" type="text" placeholder="Compte" value="${a.compte||''}" oninput="window._adjData['${c.id}'][${i}].compte=this.value;window._rerenderEcr()">
-            <input class="adj-inp" type="text" placeholder="Libellé" value="${a.lib||''}" oninput="window._adjData['${c.id}'][${i}].lib=this.value;window._rerenderEcr()">
-            <input class="adj-inp" type="text" placeholder="Anal." value="${a.anal||''}" oninput="window._adjData['${c.id}'][${i}].anal=this.value;window._rerenderEcr()">
+            <input class="adj-inp" type="text" placeholder="Compte" value="${a.compte||''}" onchange="window._adjData['${c.id}'][${i}].compte=this.value;window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
+            <input class="adj-inp" type="text" placeholder="Libellé" value="${a.lib||''}" onchange="window._adjData['${c.id}'][${i}].lib=this.value;window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
+            <input class="adj-inp" type="text" placeholder="Anal." value="${a.anal||''}" onchange="window._adjData['${c.id}'][${i}].anal=this.value;window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
             <select class="adj-inp" onchange="window._adjToggle('${c.id}',${i},this.value)">
               <option value="debit" ${(a.debit||0)>0?'selected':''}>Débit</option>
               <option value="credit" ${(a.credit||0)>0?'selected':''}>Crédit</option>
             </select>
-            <input class="adj-inp" type="number" placeholder="0,00" value="${(a.debit||0)>0?a.debit:(a.credit||0)>0?a.credit:''}" oninput="window._adjMt('${c.id}',${i},this.value)">
+            <input class="adj-inp" type="number" placeholder="0,00" value="${(a.debit||0)>0?a.debit:(a.credit||0)>0?a.credit:''}" onchange="window._adjMt('${c.id}',${i},this.value);window._rerenderEcr()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
             <button onclick="window._adjData['${c.id}'].splice(${i},1);window._rerenderEcr()" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:18px">×</button>
           </div>`).join('')}
           <button class="add-adj-btn" onclick="window._adjData['${c.id}'].push({compte:'',lib:'',anal:'${cfg.anal||''}',debit:0,credit:0});window._rerenderEcr()">+ Ajouter une ligne manuelle</button>
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.25rem">
+        <button onclick="window.ouvrirEditCaisse()" style="background:#7c3aed;color:white;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Modifier la caisse
+        </button>
         <button class="btn-valider${c.statut==='valide'?' devalider':''}" onclick="window.validerCaisse('${c.id}')">${c.statut==='valide'?'Dévalider la caisse':'✓ Valider la caisse'}</button>
       </div>
       <div class="card" style="margin-top:1rem;border:1.5px dashed #bfdbfe;background:#f0f7ff">
@@ -1212,6 +1240,165 @@ window.telechargerTousJustifs=async function(){
   }
 };
 
+// ── Éditeur comptable ─────────────────────────────────────────────────────────
+
+window._editData=null;
+
+window.ouvrirEditCaisse=function(){
+  if(!currentCaisse)return;
+  const c=currentCaisse;
+  window._editData={
+    responsable:c.responsable||'',notes:c.notes||'',
+    avances:currentAvances.map(a=>({date:a.date_avance||'',montant:a.montant||0})),
+    deps:currentDeps.map(d=>({date:d.date_depense||'',fournisseur:d.fournisseur||'',categorie:d.categorie||'',compte:d.compte||'',montant:d.montant||0})),
+    parts:currentParts.map(p=>({libelle:p.libelle||'',type:p.type||'participation',montant:p.montant||0})),
+  };
+  document.getElementById('edit-modal-subtitle').textContent='GEM '+c.gem+' — '+moisNom();
+  window._renderEditModal();
+  document.getElementById('modal-edit-caisse').classList.add('open');
+};
+
+window.fermerEditCaisse=function(){
+  document.getElementById('modal-edit-caisse').classList.remove('open');
+  window._editData=null;
+};
+
+function _fmtE(n){return(parseFloat(n)||0).toFixed(2).replace('.',',');}
+
+window._recalcEdit=function(){
+  if(!window._editData)return;
+  const e=window._editData;
+  const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
+  const td=e.deps.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+  const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
+  const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
+  const el=document.getElementById('edit-summary-block');
+  if(el)el.innerHTML=_buildSummaryHtml(ta,td,tp,solde);
+};
+
+function _buildSummaryHtml(ta,td,tp,solde){
+  return`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#555"><span>Solde ouverture</span><span>${_fmtE(currentCaisse.solde_ouverture)} €</span></div>
+  <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#16a34a"><span>+ Avances</span><span>+${_fmtE(ta)} €</span></div>
+  <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#b91c1c"><span>- Dépenses</span><span>-${_fmtE(td)} €</span></div>
+  <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#059669"><span>+ Participations / Adhésions</span><span>+${_fmtE(tp)} €</span></div>
+  <div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:2px solid #1649b8;margin-top:6px;font-size:15px;font-weight:700;color:#1649b8"><span>Solde de clôture</span><span>${_fmtE(solde)} €</span></div>`;
+}
+
+window._renderEditModal=function(){
+  const e=window._editData;
+  const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
+  const td=e.deps.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
+  const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
+  const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
+  const eb=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;
+  const ic='class="edit-inp"';
+
+  const avHtml=`<div class="edit-section"><div class="edit-section-title est-blue">Avances reçues (${e.avances.length})</div>
+    <table class="edit-table"><thead><tr><th>Date</th><th>Montant</th><th></th></tr></thead><tbody>
+    ${e.avances.map((a,i)=>`<tr>
+      <td><input ${ic} type="date" value="${a.date}" onchange="window._editData.avances[${i}].date=this.value" ${eb}></td>
+      <td><input ${ic} type="number" style="text-align:right" value="${a.montant}" onchange="window._editData.avances[${i}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
+      <td><button class="edit-del-btn" onclick="window._editData.avances.splice(${i},1);window._renderEditModal()">×</button></td>
+    </tr>`).join('')}
+    </tbody></table>
+    <button class="edit-add-btn" onclick="window._editData.avances.push({date:'',montant:0});window._renderEditModal()">+ Ajouter une avance</button></div>`;
+
+  const depHtml=`<div class="edit-section"><div class="edit-section-title est-red">Dépenses (${e.deps.length})</div>
+    <table class="edit-table"><thead><tr><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Compte</th><th>Montant</th><th></th></tr></thead><tbody>
+    ${e.deps.map((d,i)=>`<tr>
+      <td><input ${ic} type="date" value="${d.date}" onchange="window._editData.deps[${i}].date=this.value" ${eb}></td>
+      <td><input ${ic} type="text" value="${d.fournisseur||''}" onchange="window._editData.deps[${i}].fournisseur=this.value" ${eb}></td>
+      <td><input ${ic} type="text" value="${d.categorie||''}" onchange="window._editData.deps[${i}].categorie=this.value" ${eb}></td>
+      <td><input ${ic} type="text" value="${d.compte||''}" style="font-family:monospace;font-size:12px" onchange="window._editData.deps[${i}].compte=this.value" ${eb}></td>
+      <td><input ${ic} type="number" style="text-align:right" value="${d.montant||0}" onchange="window._editData.deps[${i}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
+      <td><button class="edit-del-btn" onclick="window._editData.deps.splice(${i},1);window._renderEditModal()">×</button></td>
+    </tr>`).join('')}
+    </tbody></table>
+    <button class="edit-add-btn" onclick="window._editData.deps.push({date:'',fournisseur:'',categorie:'',compte:'',montant:0});window._renderEditModal()">+ Ajouter une dépense</button></div>`;
+
+  const to=v=>`<option value="participation" ${v!=='cotisation'?'selected':''}>Participation</option><option value="cotisation" ${v==='cotisation'?'selected':''}>Adhésion</option>`;
+  const partHtml=`<div class="edit-section"><div class="edit-section-title est-green">Participations / Adhésions (${e.parts.length})</div>
+    <table class="edit-table"><thead><tr><th>Libellé</th><th>Type</th><th>Montant</th><th></th></tr></thead><tbody>
+    ${e.parts.map((p,i)=>`<tr>
+      <td><input ${ic} type="text" value="${p.libelle||''}" onchange="window._editData.parts[${i}].libelle=this.value" ${eb}></td>
+      <td><select class="edit-inp" style="width:auto" onchange="window._editData.parts[${i}].type=this.value">${to(p.type)}</select></td>
+      <td><input ${ic} type="number" style="text-align:right" value="${p.montant||0}" onchange="window._editData.parts[${i}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
+      <td><button class="edit-del-btn" onclick="window._editData.parts.splice(${i},1);window._renderEditModal()">×</button></td>
+    </tr>`).join('')}
+    </tbody></table>
+    <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0});window._renderEditModal()">+ Ajouter une ligne</button></div>`;
+
+  const tc=totalComptage(currentCaisse);
+  const ev=tc!==null?Math.round((tc-solde)*100)/100:null;
+  const ecartLine=ev!==null?`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:${Math.abs(ev)<0.01?'#16a34a':ev>0?'#d97706':'#dc2626'}"><span>Écart comptage</span><span>${Math.abs(ev)<0.01?'Conforme':(ev>0?'+':'')+_fmtE(ev)+' €'}</span></div>`:'';
+
+  document.getElementById('modal-edit-content').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem">
+      <div><label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;display:block;margin-bottom:5px">Responsable</label>
+        <input class="edit-inp" type="text" value="${e.responsable}" onchange="window._editData.responsable=this.value" ${eb}></div>
+      <div><label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;display:block;margin-bottom:5px">Notes comptable</label>
+        <input class="edit-inp" type="text" value="${e.notes||''}" onchange="window._editData.notes=this.value" ${eb}></div>
+    </div>
+    ${avHtml}${depHtml}${partHtml}
+    <div class="edit-summary">
+      <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Récapitulatif recalculé</div>
+      <div id="edit-summary-block">${_buildSummaryHtml(ta,td,tp,solde)}</div>
+      ${ecartLine?`<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid #eee">${ecartLine}</div>`:''}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:.5rem;border-top:1px solid #eee">
+      <button onclick="window.fermerEditCaisse()" style="padding:10px 20px;border-radius:10px;border:1px solid #ddd;background:white;font-size:13px;cursor:pointer;font-family:inherit">Annuler</button>
+      <button class="btn-save-edit" onclick="window.sauvegarderEditCaisse()">✓ Valider et enregistrer</button>
+    </div>`;
+};
+
+window.sauvegarderEditCaisse=async function(){
+  if(!window._editData||!currentCaisse)return;
+  const e=window._editData;
+  const btn=document.querySelector('.btn-save-edit');
+  if(btn){btn.disabled=true;btn.textContent='Enregistrement...';}
+  try{
+    const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
+    const td=e.deps.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+    const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
+    const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
+    const snap={
+      ...(currentCaisse.donnees_brouillon||{}),
+      responsable:e.responsable,
+      avances:e.avances.map((a,i)=>({id:i+1,date:a.date,montant:parseFloat(a.montant)||0})),
+      deps:e.deps.map((d,i)=>({
+        id:i+1,date:d.date,fournisseur:d.fournisseur,
+        ventils:[{id:(i+1)*100,cat:{label:d.categorie||'Autres',compte:d.compte||'Autres',icon:CATS_ICONS[d.categorie]||'📦'},montant:parseFloat(d.montant)||0}],
+        files:[],justificatif_url:currentDeps[i]?.justificatif_url||''
+      })),
+      parts:e.parts.map((p,i)=>({
+        id:i+1,libelle:p.libelle,type:p.type,montant:parseFloat(p.montant)||0,
+        files:[],justificatif_url:currentParts[i]?.justificatif_url||''
+      })),
+      is_snapshot:true,send_count:currentCaisse.donnees_brouillon?.send_count||1,comptable_modifie:true
+    };
+    const{error}=await supabase.from('caisses').update({
+      responsable:e.responsable,notes:e.notes,
+      total_avances:Math.round(ta*100)/100,total_depenses:Math.round(td*100)/100,
+      total_participations:Math.round(tp*100)/100,solde_cloture:solde,
+      donnees_brouillon:snap
+    }).eq('id',currentCaisse.id);
+    if(error)throw error;
+    currentCaisse.responsable=e.responsable;currentCaisse.notes=e.notes;
+    currentCaisse.total_avances=Math.round(ta*100)/100;currentCaisse.total_depenses=Math.round(td*100)/100;
+    currentCaisse.total_participations=Math.round(tp*100)/100;currentCaisse.solde_cloture=solde;
+    currentCaisse.donnees_brouillon=snap;
+    currentAvances=snap.avances.map(a=>({...a,date_avance:a.date}));
+    currentDeps=snap.deps.map(d=>({...d,date_depense:d.date,categorie:d.ventils.map(v=>v.cat?.label||'').join(', '),montant:d.ventils.reduce((s,v)=>s+(v.montant||0),0)}));
+    currentParts=snap.parts.map(p=>({...p}));
+    window.fermerEditCaisse();
+    renderKpiGrid();
+    window.switchTab('resume',document.querySelector('.tab:first-child'));
+    loadCaisses();
+  }catch(err){
+    console.error(err);alert('Erreur : '+(err.message||'réessayez.'));
+  }finally{if(btn){btn.disabled=false;btn.textContent='✓ Valider et enregistrer';}}
+};
+
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 window.saveNote=function(){
@@ -1237,5 +1424,19 @@ window.doLogout=function(){localStorage.removeItem('falret_user');window.locatio
 
 init();
 </script>
+<!-- Modal édition comptable -->
+<div class="edit-modal-overlay" id="modal-edit-caisse">
+  <div class="edit-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid #eee">
+      <div>
+        <div style="font-size:18px;font-weight:800;color:#1a1a1a">✏️ Modifier la caisse</div>
+        <div style="font-size:12px;color:#888;margin-top:3px" id="edit-modal-subtitle"></div>
+      </div>
+      <button onclick="window.fermerEditCaisse()" style="border:none;background:#f0f0f0;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-family:inherit">✕ Annuler</button>
+    </div>
+    <div id="modal-edit-content"></div>
+  </div>
+</div>
+
 </body>
 </html>
