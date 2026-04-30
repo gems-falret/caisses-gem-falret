@@ -537,83 +537,109 @@ async function ouvrirCompteRendu(moisStr){
   const ecartColor=ecartCpt===null?'#888':Math.abs(ecartCpt)<0.01?'#16a34a':ecartCpt>0?'#854d0e':'#dc2626';
   const ecartTxt=ecartCpt===null?'—':Math.abs(ecartCpt)<0.01?'✓ Conforme':(ecartCpt>0?'+':'')+ecartCpt.toFixed(2).replace('.',',')+' €';
 
-  let html='';
-  if(estValide)html+=`<div class="locked-banner">🔒 Cette caisse a été validée par la comptabilité. Elle est en lecture seule.</div>`;
-
-  html+=`<div class="cr-section">
-    <div class="cr-section-title">Résumé</div>
-    <div class="cr-row"><span style="color:#888">Responsable</span><span>${c.responsable||'—'}</span></div>
-    <div class="cr-row"><span style="color:#888">Solde ouverture</span><span>${(c.solde_ouverture||0).toFixed(2).replace('.',',')} €</span></div>
-    <div class="cr-row"><span style="color:#888">Total avances</span><span style="color:#16a34a">+${(c.total_avances||0).toFixed(2).replace('.',',')} €</span></div>
-    <div class="cr-row"><span style="color:#888">Total dépenses</span><span style="color:#dc2626">-${(c.total_depenses||0).toFixed(2).replace('.',',')} €</span></div>
-    <div class="cr-row"><span style="color:#888">Total participations/adhésions</span><span style="color:#16a34a">+${(c.total_participations||0).toFixed(2).replace('.',',')} €</span></div>
-    <div class="cr-row" style="border-top:2px solid #eee;padding-top:10px;margin-top:4px"><span style="font-weight:600">Solde théorique clôture</span><span style="font-weight:700;font-size:16px">${(c.solde_cloture||0).toFixed(2).replace('.',',')} €</span></div>
-    ${totalCpt!==null?`
-    <div class="cr-row" style="padding-top:6px"><span style="color:#888">Comptage physique</span><span style="font-weight:600">${totalCpt.toFixed(2).replace('.',',')} €</span></div>
-    <div class="cr-row" style="background:${Math.abs(ecartCpt)<0.01?'#f0fdf4':ecartCpt>0?'#fefce8':'#fff5f5'};border-radius:8px;padding:8px 10px;margin-top:4px">
-      <span style="font-weight:600;color:#555">Écart caisse</span>
-      <span style="font-weight:700;font-size:15px;color:${ecartColor}">${ecartTxt}</span>
-    </div>`:''}
+  const f2=n=>(parseFloat(n)||0).toFixed(2).replace('.',',');
+  const kpi=(label,val,bg,color,prefix='')=>`<div style="background:${bg};border-radius:10px;padding:10px 8px;text-align:center">
+    <div style="font-size:10px;color:#888;text-transform:uppercase;font-weight:600;margin-bottom:3px">${label}</div>
+    <div style="font-size:15px;font-weight:700;color:${color}">${prefix}${f2(val)} €</div>
   </div>`;
 
-  if(c.notes)html+=`<div class="cr-section"><div class="cr-section-title">Observations</div><div class="cr-obs">${c.notes}</div></div>`;
+  let html='';
+  if(estValide)html+=`<div class="locked-banner">🔒 Cette caisse a été validée par la comptabilité.</div>`;
+  if(c.donnees_brouillon?.comptable_modifie)html+=`<div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:10px 14px;margin-bottom:.75rem;font-size:13px;color:#854d0e;display:flex;align-items:center;gap:8px">⚠️ Cette caisse a été modifiée par la comptabilité.</div>`;
 
+  // ── KPI strip ──
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:.75rem">
+    ${kpi('Avances',c.total_avances,'#f0fdf4','#16a34a','+')}
+    ${kpi('Dépenses',c.total_depenses,'#fff5f5','#dc2626','-')}
+    ${kpi('Participations',c.total_participations,'#f0fdf4','#059669','+')}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:${totalCpt!==null?'.5rem':'1rem'}">
+    ${kpi('Solde ouverture',c.solde_ouverture,'#eff6ff','#1d4ed8')}
+    <div style="background:#1649b8;border-radius:10px;padding:10px 8px;text-align:center">
+      <div style="font-size:10px;color:rgba(255,255,255,.7);text-transform:uppercase;font-weight:600;margin-bottom:3px">Solde clôture</div>
+      <div style="font-size:18px;font-weight:800;color:white">${f2(c.solde_cloture)} €</div>
+    </div>
+  </div>`;
+
+  if(totalCpt!==null){
+    html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:1rem">
+      ${kpi('Comptage physique',totalCpt,'#f5f3ff','#7c3aed')}
+      <div style="background:${Math.abs(ecartCpt)<0.01?'#f0fdf4':ecartCpt>0?'#fefce8':'#fff5f5'};border-radius:10px;padding:10px 8px;text-align:center;border:2px solid ${Math.abs(ecartCpt)<0.01?'#86efac':ecartCpt>0?'#fde047':'#fca5a5'}">
+        <div style="font-size:10px;color:#888;text-transform:uppercase;font-weight:600;margin-bottom:3px">Écart caisse</div>
+        <div style="font-size:15px;font-weight:700;color:${ecartColor}">${ecartTxt}</div>
+      </div>
+    </div>`;
+  }
+
+  // ── Infos & notes ──
+  html+=`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;margin-bottom:${c.notes?'4px':'1rem'}"><span style="color:#aaa">Responsable</span><span style="font-weight:600">${c.responsable||'—'}</span></div>`;
+  if(c.notes)html+=`<div style="background:#fafafa;border-radius:8px;padding:8px 12px;font-size:12px;color:#555;margin-bottom:1rem;border-left:3px solid #e0e0e0">${c.notes}</div>`;
+
+  // ── helper table ──
+  const tblHead=(...cols)=>`<thead><tr>${cols.map(([label,align,w])=>`<th style="padding:6px 8px;text-align:${align||'left'};background:#f8f8f8;border-bottom:2px solid #eee;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;white-space:nowrap${w?';width:'+w:''}">${label}</th>`).join('')}</tr></thead>`;
+  const tblRow=(i,...cells)=>`<tr style="background:${i%2===0?'white':'#fafafa'}">${cells.map(([val,align,color,bold])=>`<td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:${align||'left'}${color?';color:'+color:''}${bold?';font-weight:700':''}">${val}</td>`).join('')}</tr>`;
+  const tblFoot=(...cells)=>`<tfoot><tr style="background:#f8f8f8">${cells.map(([val,align,color])=>`<td style="padding:7px 8px;font-size:13px;font-weight:700;text-align:${align||'left'}${color?';color:'+color:''}">${val}</td>`).join('')}</tr></tfoot>`;
+  const justifCell=url=>{
+    const urls=(url||'').split(',').filter(u=>u.trim());
+    return urls.length>0?urls.map(u=>`<button class="justif-link" style="padding:2px 6px;font-size:11px" onclick="window.voirJustif('${u}')">📎</button>`).join(''):'<span style="color:#dc2626;font-size:11px">❌</span>';
+  };
+
+  // ── Avances ──
   if(finalAvances.length){
-    html+=`<div class="cr-section"><div class="cr-section-title">Avances reçues (${finalAvances.length})</div>`;
-    finalAvances.forEach(a=>{html+=`<div class="cr-row"><span style="color:#888">${a.date_avance||'—'}</span><span style="color:#16a34a;font-weight:600">+${(a.montant||0).toFixed(2).replace('.',',')} €</span></div>`;});
-    html+=`<div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total avances</span><span style="color:#16a34a;font-weight:600">+${finalAvances.reduce((s,a)=>s+(a.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
+    const total=finalAvances.reduce((s,a)=>s+(a.montant||0),0);
+    html+=`<div class="cr-section"><div class="cr-section-title" style="color:#1d4ed8">Avances reçues (${finalAvances.length})</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      ${tblHead(['Date','left','90px'],['Montant','right'])}
+      <tbody>${finalAvances.map((a,i)=>tblRow(i,
+        [a.date_avance||'—','left','#888'],
+        ['+'+f2(a.montant)+' €','right','#16a34a',true]
+      )).join('')}</tbody>
+      ${tblFoot(['Total avances','right'],['+ '+f2(total)+' €','right','#16a34a'])}
+    </table></div></div>`;
   }
 
+  // ── Dépenses ──
   if(finalDeps.length){
-    html+=`<div class="cr-section"><div class="cr-section-title" style="color:#A32D2D">Dépenses (${finalDeps.length})</div>`;
-    finalDeps.forEach(d=>{
-      const justifUrls=d.justificatif_url?d.justificatif_url.split(',').filter(u=>u.trim()):[];
-      html+=`<div class="cr-dep" style="border-left:3px solid #F7C1C1">
-        <div class="cr-dep-titre">${d.fournisseur||'—'} <span style="color:#dc2626;float:right;font-weight:600">${(d.montant||0).toFixed(2).replace('.',',')} €</span></div>
-        <div class="cr-dep-detail">${d.date_depense||'—'} · ${d.categorie||'—'}</div>
-        <div style="margin-top:6px">${justifUrls.length>0?justifUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join(' '):'<span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">❌ Pas de justificatif</span>'}</div>
-      </div>`;
-    });
-    html+=`<div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total dépenses</span><span style="color:#dc2626;font-weight:600">-${finalDeps.reduce((s,d)=>s+(d.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
+    const total=finalDeps.reduce((s,d)=>s+(d.montant||0),0);
+    html+=`<div class="cr-section"><div class="cr-section-title" style="color:#A32D2D">Dépenses (${finalDeps.length})</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      ${tblHead(['#','center','28px'],['Fournisseur','left'],['Date','left','80px'],['Catégorie','left'],['Montant','right','70px'],['Justif.','center','42px'])}
+      <tbody>${finalDeps.map((d,i)=>tblRow(i,
+        [String(i+1),'center','#aaa'],
+        [d.fournisseur||'—','left','#1a1a1a',true],
+        [d.date_depense||'—','left','#888'],
+        [`<span style="font-size:11px">${d.categorie||'—'}</span>`,'left','#555'],
+        [f2(d.montant)+' €','right','#dc2626',true],
+        [justifCell(d.justificatif_url),'center']
+      )).join('')}</tbody>
+      ${tblFoot(['',''],['',''],['',''],['Total','right'],['- '+f2(total)+' €','right','#dc2626'],['',''])}
+    </table></div></div>`;
   }
 
+  // ── Participations & Adhésions ──
   if(finalParts.length){
-    const participations=finalParts.filter(p=>!p.type||p.type==='participation');
-    const cotisations=finalParts.filter(p=>p.type==='cotisation');
-
-    if(participations.length){
-      html+=`<div class="cr-section"><div class="cr-section-title" style="color:#0F6E56">Participations adhérents (${participations.length})</div>`;
-      participations.forEach(p=>{
-        const justifUrls=p.justificatif_url?p.justificatif_url.split(',').filter(u=>u.trim()):[];
-        html+=`<div class="cr-dep" style="border-left:3px solid #9FE1CB">
-          <div class="cr-dep-titre">${p.libelle||'—'} <span style="color:#16a34a;float:right;font-weight:600">+${(p.montant||0).toFixed(2).replace('.',',')} €</span></div>
-          <div style="margin-top:6px">${justifUrls.length>0?justifUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join(' '):'<span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">❌ Pas de justificatif</span>'}</div>
-        </div>`;
-      });
-      html+=`</div>`;
-    }
-
-    if(cotisations.length){
-      html+=`<div class="cr-section"><div class="cr-section-title" style="color:#854d0e">Adhésions adhérents (${cotisations.length})</div>`;
-      cotisations.forEach(p=>{
-        const justifUrls=p.justificatif_url?p.justificatif_url.split(',').filter(u=>u.trim()):[];
-        html+=`<div class="cr-dep" style="border-left:3px solid #fde047">
-          <div class="cr-dep-titre">${p.libelle||'—'} <span style="color:#16a34a;float:right;font-weight:600">+${(p.montant||0).toFixed(2).replace('.',',')} €</span></div>
-          <div style="margin-top:6px">${justifUrls.length>0?justifUrls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join(' '):'<span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">❌ Pas de justificatif</span>'}</div>
-        </div>`;
-      });
-      html+=`</div>`;
-    }
-
-    if(participations.length||cotisations.length){
-      html+=`<div class="cr-section"><div class="cr-row" style="border-top:1px solid #eee;padding-top:6px"><span style="color:#888">Total participations/adhésions</span><span style="color:#16a34a;font-weight:600">+${finalParts.reduce((s,p)=>s+(p.montant||0),0).toFixed(2).replace('.',',')} €</span></div></div>`;
-    }
+    const total=finalParts.reduce((s,p)=>s+(p.montant||0),0);
+    html+=`<div class="cr-section"><div class="cr-section-title" style="color:#0F6E56">Participations / Adhésions (${finalParts.length})</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      ${tblHead(['#','center','28px'],['Libellé','left'],['Type','left','80px'],['Montant','right','70px'],['Justif.','center','42px'])}
+      <tbody>${finalParts.map((p,i)=>{
+        const isAdh=p.type==='cotisation';
+        return tblRow(i,
+          [String(i+1),'center','#aaa'],
+          [p.libelle||'—','left','#1a1a1a',true],
+          [`<span style="font-size:11px;padding:1px 7px;border-radius:5px;background:${isAdh?'#fef3c7':'#dcfce7'};color:${isAdh?'#92400e':'#166534'}">${isAdh?'Adhésion':'Participation'}</span>`,'left'],
+          ['+'+f2(p.montant)+' €','right','#059669',true],
+          [justifCell(p.justificatif_url),'center']
+        );
+      }).join('')}</tbody>
+      ${tblFoot(['',''],['',''],['Total','right'],['+ '+f2(total)+' €','right','#059669'],['',''])}
+    </table></div></div>`;
   }
 
   html+=`<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn" style="flex:1" onclick="window.fermerCR()">Fermer</button>
     <button class="btn" style="flex:1;background:#f0fdf4;border-color:#6ee7b7;color:#059669;font-weight:600" onclick="window.telechargerCaisseGemPdf()">📄 Télécharger PDF</button>
-    ${!estValide?`<button class="btn btn-primary" style="flex:1" onclick="window.fermerCRModifier('${moisStr}')">✏️ Modifier cette caisse</button>`:''}
+    ${!estValide&&!c.donnees_brouillon?.comptable_modifie?`<button class="btn btn-primary" style="flex:1" onclick="window.fermerCRModifier('${moisStr}')">✏️ Modifier cette caisse</button>`:''}
   </div>`;
 
   // Stocker les données pour le PDF
