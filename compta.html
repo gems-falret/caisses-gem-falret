@@ -77,8 +77,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .total-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8f8f8;border-radius:8px;margin-top:.75rem;font-weight:600;font-size:14px}
 
 /* Dep card */
-.dep-card{background:white;border:1.5px solid #f0bfbf;border-radius:12px;margin-bottom:.75rem;overflow:hidden}
-.dep-card-header{display:flex;align-items:center;gap:10px;padding:.75rem 1rem;background:#d97070;border-bottom:none}
+.dep-card{background:white;border:1.5px solid #e8d0d0;border-radius:12px;margin-bottom:.75rem;overflow:hidden}
+.dep-card-header{display:flex;align-items:center;gap:10px;padding:.75rem 1rem;background:#b07878;border-bottom:none}
 .dep-num-badge{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;border:1.5px solid rgba(255,255,255,0.4)}
 .dep-body{padding:1rem;background:white}
 .dep-info-row{display:flex;gap:1.5rem;margin-bottom:.75rem;flex-wrap:wrap}
@@ -1295,6 +1295,8 @@ window._recalcEditComptage=function(){
   const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
   const td=e.deps.reduce((s,d)=>s+d.ventils.reduce((sv,v)=>sv+(parseFloat(v.montant)||0),0),0);
   const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
+  const elDT=document.getElementById('edit-deps-grand-total');if(elDT)elDT.textContent=_fmtE(td)+' €';
+  const elPT=document.getElementById('edit-parts-grand-total');if(elPT)elPT.textContent=_fmtE(tp)+' €';
   const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
   const ev=Math.round((tc-solde)*100)/100;
   const el=document.getElementById('edit-cpt-total');
@@ -1306,12 +1308,22 @@ window._recalcEditComptage=function(){
 window._recalcEdit=function(){
   if(!window._editData)return;
   const e=window._editData;
+  // Update each dep header total
+  e.deps.forEach((d,di)=>{
+    const tot=d.ventils.reduce((s,v)=>s+(parseFloat(v.montant)||0),0);
+    const el=document.getElementById('edit-dep-tot-'+di);
+    if(el)el.textContent=_fmtE(tot)+' €';
+  });
   const ta=e.avances.reduce((s,a)=>s+(parseFloat(a.montant)||0),0);
   const td=e.deps.reduce((s,d)=>s+d.ventils.reduce((sv,v)=>sv+(parseFloat(v.montant)||0),0),0);
   const tp=e.parts.reduce((s,p)=>s+(parseFloat(p.montant)||0),0);
   const solde=Math.round((currentCaisse.solde_ouverture+ta+tp-td)*100)/100;
   const el=document.getElementById('edit-summary-block');
   if(el)el.innerHTML=_buildSummaryHtml(ta,td,tp,solde);
+  const elDT=document.getElementById('edit-deps-grand-total');
+  if(elDT)elDT.textContent=_fmtE(td)+' €';
+  const elPT=document.getElementById('edit-parts-grand-total');
+  if(elPT)elPT.textContent=_fmtE(tp)+' €';
 };
 
 function _buildSummaryHtml(ta,td,tp,solde){
@@ -1348,7 +1360,7 @@ window._renderEditModal=function(){
         <div style="display:grid;grid-template-columns:130px 1fr auto auto;gap:6px;align-items:center;padding:8px 10px;background:#fff5f5">
           <input ${ic} type="date" value="${d.date}" onchange="window._editData.deps[${di}].date=this.value" ${eb}>
           <input ${ic} type="text" placeholder="Fournisseur" value="${d.fournisseur||''}" onchange="window._editData.deps[${di}].fournisseur=this.value" ${eb}>
-          <span style="font-weight:700;color:#b91c1c;white-space:nowrap">${_fmtE(dTot)} €</span>
+          <span id="edit-dep-tot-${di}" style="font-weight:700;color:#b91c1c;white-space:nowrap">${_fmtE(dTot)} €</span>
           <button class="edit-del-btn" onclick="window._editData.deps.splice(${di},1);window._renderEditModal()">×</button>
         </div>
         <table class="edit-table" style="margin:0"><thead><tr><th>Libellé / Nature</th><th>Compte</th><th>Montant</th><th></th></tr></thead><tbody>
@@ -1362,7 +1374,8 @@ window._renderEditModal=function(){
         <div style="padding:4px 10px 8px"><button class="edit-add-btn" style="margin:0" onclick="window._editData.deps[${di}].ventils.push({libelle:'',compte:'',montant:0});window._renderEditModal()">+ Autre nature sur ce ticket</button></div>
       </div>`;
     }).join('')}
-    <button class="edit-add-btn" onclick="window._editData.deps.push({date:'',fournisseur:'',ventils:[{libelle:'',compte:'',montant:0}],justificatif_url:''});window._renderEditModal()">+ Ajouter une dépense</button></div>`;
+    <button class="edit-add-btn" onclick="window._editData.deps.push({date:'',fournisseur:'',ventils:[{libelle:'',compte:'',montant:0}],justificatif_url:''});window._renderEditModal()">+ Ajouter une dépense</button>
+    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#fff5f5;border-radius:8px;margin-top:6px;font-weight:700;font-size:13px;color:#b91c1c"><span>Total dépenses</span><span id="edit-deps-grand-total">${_fmtE(td)} €</span></div></div>`;
 
   const to=v=>`<option value="participation" ${v!=='cotisation'?'selected':''}>Participation</option><option value="cotisation" ${v==='cotisation'?'selected':''}>Adhésion</option>`;
   const partHtml=`<div class="edit-section"><div class="edit-section-title est-green">Participations / Adhésions (${e.parts.length})</div>
@@ -1375,7 +1388,8 @@ window._renderEditModal=function(){
       <td><button class="edit-del-btn" onclick="window._editData.parts.splice(${i},1);window._renderEditModal()">×</button></td>
     </tr>`).join('')}
     </tbody></table>
-    <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0,compte:''});window._renderEditModal()">+ Ajouter une ligne</button></div>`;
+    <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0,compte:''});window._renderEditModal()">+ Ajouter une ligne</button>
+    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#d1fae5;border-radius:8px;margin-top:6px;font-weight:700;font-size:13px;color:#065f46"><span>Total participations / adhésions</span><span id="edit-parts-grand-total">${_fmtE(tp)} €</span></div></div>`;
 
   // Comptage section
   const eb2=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;

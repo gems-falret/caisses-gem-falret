@@ -1269,26 +1269,26 @@ function buildRecap(){
   const td=deps.reduce((s,d)=>s+depTotal(d),0);
   const tp=parts.reduce((s,p)=>s+(p.montant||0),0);
   const ta=avances.reduce((s,a)=>s+(a.montant||0),0);
-  let html=`
-    <div class="recap-row"><span style="color:#888">GEM</span><span style="font-weight:600">${USER.gem}</span></div>
-    <div class="recap-row"><span style="color:#888">Mois</span><span>${mois}</span></div>
-    <div class="recap-row"><span style="color:#888">Responsable</span><span>${resp}</span></div>
-    <div class="recap-row"><span style="color:#888">Solde d'ouverture</span><span>${soldePrecedent.toFixed(2).replace('.',',')} €</span></div>
-    <div class="recap-row"><span style="color:#888">Total avances</span><span style="color:#16a34a">+${ta.toFixed(2).replace('.',',')} €</span></div>
-    <div class="recap-row"><span style="color:#888">Total dépenses</span><span style="color:#dc2626;font-weight:600">-${td.toFixed(2).replace('.',',')} €</span></div>`;
-  deps.forEach((d,i)=>{
-    const cats=d.ventils.filter(v=>v.cat).map(v=>`${v.cat.icon} ${v.cat.label} ${v.montant.toFixed(2)}€`).join(' · ');
-    const hasJustif=(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0;
-    html+=`<div class="recap-sub"><span>${i+1}. ${d.fournisseur||'—'}${d.date?' ('+d.date+')':''} — ${cats||'Non catégorisé'}</span><span>${depTotal(d).toFixed(2).replace('.',',')} € ${hasJustif?'✅':'⚠️'}</span></div>`;
-  });
-  html+=`<div class="recap-row" style="margin-top:4px"><span style="color:#888">Total participations/adhésions</span><span style="color:#16a34a;font-weight:600">+${tp.toFixed(2).replace('.',',')} €</span></div>`;
-  parts.forEach((p,i)=>{
-    const hasJustif=(p.justificatif_url&&p.justificatif_url.length>0)||p.files?.length>0;
-    const badge=p.type==='cotisation'?'<span class="type-badge type-cotisation">Adhésion</span>':'<span class="type-badge type-participation">Participation</span>';
-    html+=`<div class="recap-sub"><span>${i+1}. ${p.libelle||'—'} ${badge}</span><span>${(p.montant||0).toFixed(2).replace('.',',')} € ${hasJustif?'✅':'⚠️'}</span></div>`;
-  });
   const soldeEstime=Math.round((soldePrecedent+ta+tp-td)*100)/100;
-  html+=`<div class="recap-row" style="border-top:2px solid #eee;margin-top:8px;padding-top:12px"><span style="font-weight:600">Solde théorique de clôture</span><span style="font-size:16px;font-weight:600">${soldeEstime.toFixed(2).replace('.',',')} €</span></div>`;
+  const f2=n=>(parseFloat(n)||0).toFixed(2).replace('.',',');
+  const kpi=(label,val,bg,color,prefix='')=>`<div style="background:${bg};border-radius:10px;padding:10px 8px;text-align:center"><div style="font-size:10px;color:#888;text-transform:uppercase;font-weight:600;margin-bottom:3px">${label}</div><div style="font-size:15px;font-weight:700;color:${color}">${prefix}${f2(val)} €</div></div>`;
+  const th=(...cols)=>`<thead><tr>${cols.map(([l,a,w])=>`<th style="padding:5px 7px;text-align:${a||'left'};background:#f8f8f8;border-bottom:2px solid #eee;font-size:10px;font-weight:700;color:#888;text-transform:uppercase${w?';width:'+w:''}">${l}</th>`).join('')}</tr></thead>`;
+  const tr=(i,...cells)=>`<tr style="background:${i%2===0?'white':'#fafafa'}">${cells.map(([v,a,c,b])=>`<td style="padding:5px 7px;border-bottom:1px solid #f0f0f0;font-size:12px;text-align:${a||'left'}${c?';color:'+c:''}${b?';font-weight:700':''}">${v}</td>`).join('')}</tr>`;
+  const tf=(...cells)=>`<tfoot><tr style="background:#f8f8f8">${cells.map(([v,a,c])=>`<td style="padding:6px 7px;font-size:12px;font-weight:700;text-align:${a||'left'}${c?';color:'+c:''}">${v}</td>`).join('')}</tr></tfoot>`;
+
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid #f0f0f0">
+    <div style="font-size:14px;font-weight:700">${USER.gem}</div>
+    <div style="font-size:12px;color:#888">${mois} · ${resp}</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:.75rem">
+    ${kpi('Avances',ta,'#f0fdf4','#16a34a','+')}
+    ${kpi('Dépenses',td,'#fff5f5','#dc2626','-')}
+    ${kpi('Participations',tp,'#f0fdf4','#059669','+')}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:1rem">
+    ${kpi('Solde ouverture',soldePrecedent,'#eff6ff','#1d4ed8')}
+    <div style="background:#1649b8;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.7);text-transform:uppercase;font-weight:600;margin-bottom:3px">Solde clôture estimé</div><div style="font-size:18px;font-weight:800;color:white">${f2(soldeEstime)} €</div></div>
+  </div>`;
 
   // Comptage physique et écart
   const cptData=comptageEnCours||caisseCourante?.comptage||caisseCourante?.donnees_brouillon?.comptage;
@@ -1300,13 +1300,47 @@ function buildRecap(){
     const ecartColor=Math.abs(ecart)<0.01?'#16a34a':ecart>0?'#854d0e':'#dc2626';
     const ecartBg=Math.abs(ecart)<0.01?'#f0fdf4':ecart>0?'#fefce8':'#fff5f5';
     const ecartTxt=Math.abs(ecart)<0.01?'✅ Conforme':(ecart>0?'📈 +':'📉 ')+ecart.toFixed(2).replace('.',',')+' €';
-    html+=`
-      <div class="recap-row" style="margin-top:4px"><span style="color:#888">Comptage physique</span><span style="font-weight:600">${totalCpt.toFixed(2).replace('.',',')} €</span></div>
-      <div class="recap-row" style="background:${ecartBg};border-radius:8px;padding:8px 10px;margin-top:4px">
-        <span style="font-weight:600;color:#555">Écart caisse</span>
-        <span style="font-weight:700;color:${ecartColor}">${ecartTxt}</span>
-      </div>`;
+    html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:1rem">
+      ${kpi('Comptage physique',totalCpt,'#f5f3ff','#7c3aed')}
+      <div style="background:${ecartBg};border-radius:10px;padding:10px 8px;text-align:center;border:2px solid ${Math.abs(ecart)<0.01?'#86efac':ecart>0?'#fde047':'#fca5a5'}"><div style="font-size:10px;color:#888;text-transform:uppercase;font-weight:600;margin-bottom:3px">Écart caisse</div><div style="font-size:15px;font-weight:700;color:${ecartColor}">${ecartTxt}</div></div>
+    </div>`;
   }
+
+  // Tableau dépenses
+  if(deps.length){
+    html+=`<div style="margin-bottom:1rem"><div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">Dépenses (${deps.length})</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      ${th(['#','center','24px'],['Fournisseur','left'],['Catégorie(s)','left'],['Montant','right','70px'],['Justif.','center','36px'])}
+      <tbody>${deps.map((d,i)=>{
+        const cats=d.ventils.filter(v=>v.cat).map(v=>`${v.cat.icon} ${v.cat.label}`).join(', ')||'Non catégorisé';
+        const hasJustif=(d.justificatif_url&&d.justificatif_url.length>0)||d.files?.length>0;
+        return tr(i,[String(i+1),'center','#aaa'],[d.fournisseur||'—','left','#1a1a1a',true],[`<span style="font-size:11px">${cats}</span>`,'left','#555'],[f2(depTotal(d))+' €','right','#dc2626',true],[hasJustif?'✅':'⚠️','center']);
+      }).join('')}</tbody>
+      ${tf(['',''],['',''],['Total dépenses','right','#555'],['-'+f2(td)+' €','right','#dc2626'],['',''])}
+    </table></div></div>`;
+  }
+
+  // Tableau participations
+  if(parts.length){
+    html+=`<div style="margin-bottom:1rem"><div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">Participations / Adhésions (${parts.length})</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      ${th(['#','center','24px'],['Libellé','left'],['Type','left','70px'],['Montant','right','70px'],['Justif.','center','36px'])}
+      <tbody>${parts.map((p,i)=>{
+        const hasJustif=(p.justificatif_url&&p.justificatif_url.length>0)||p.files?.length>0;
+        const isAdh=p.type==='cotisation';
+        const badge=`<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:${isAdh?'#fef3c7':'#dcfce7'};color:${isAdh?'#92400e':'#166534'}">${isAdh?'Adhésion':'Participation'}</span>`;
+        return tr(i,[String(i+1),'center','#aaa'],[p.libelle||'—','left','#1a1a1a',true],[badge,'left'],['+'+f2(p.montant)+' €','right','#059669',true],[hasJustif?'✅':'⚠️','center']);
+      }).join('')}</tbody>
+      ${tf(['',''],['',''],['Total participations','right','#555'],['+'+f2(tp)+' €','right','#059669'],['',''])}
+    </table></div></div>`;
+  }
+
+  // Avances
+  if(avances.length){
+    html+=`<div style="margin-bottom:.75rem"><div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">Avances reçues (${avances.length})</div>
+    ${avances.map(a=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><span style="color:#888">${a.date||'—'}</span><span style="color:#16a34a;font-weight:600">+${f2(a.montant)} €</span></div>`).join('')}</div>`;
+  }
+
   document.getElementById('recap-content').innerHTML=html;
   const obsEl=document.getElementById('observations');
   if(obsEl&&caisseCourante?.notes)obsEl.value=caisseCourante.notes;
