@@ -223,17 +223,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <!-- Vue liste -->
 <div id="vue-liste" class="container">
-  <div class="metrics">
-    <div class="mc"><div class="mc-label">Total GEM</div><div class="mc-val" id="cnt-total">—</div></div>
-    <div class="mc"><div class="mc-label">Validés</div><div class="mc-val" style="color:#16a34a" id="cnt-ok">0</div></div>
-    <div class="mc"><div class="mc-label">À vérifier</div><div class="mc-val" style="color:#854d0e" id="cnt-warn">0</div></div>
-    <div class="mc"><div class="mc-label">En attente</div><div class="mc-val" style="color:#888" id="cnt-wait">0</div></div>
+  <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
+    <div class="mc"><div class="mc-label">Total GEM</div><div class="mc-val" style="color:#888" id="cnt-total">—</div></div>
+    <div class="mc" style="border-left:4px solid #93c5fd"><div class="mc-label">Caisses reçues</div><div class="mc-val" style="color:#1d4ed8" id="cnt-recues">0</div></div>
+    <div class="mc" style="border-left:4px solid #86efac"><div class="mc-label">Caisses validées</div><div class="mc-val" style="color:#16a34a" id="cnt-ok">0</div></div>
+    <div class="mc" style="border-left:4px solid #fcd34d"><div class="mc-label">Nouvelles modif.</div><div class="mc-val" style="color:#d97706" id="cnt-modif">0</div></div>
   </div>
   <div class="filters">
     <button class="filter-btn active" onclick="window.setFilter('tous',this)">Tous</button>
     <button class="filter-btn" onclick="window.setFilter('valide',this)">Validés</button>
-    <button class="filter-btn" onclick="window.setFilter('en_attente',this)">En attente</button>
-    <button class="filter-btn" onclick="window.setFilter('anomalie',this)">Anomalie</button>
+    <button class="filter-btn" onclick="window.setFilter('recues',this)">Reçues</button>
+    <button class="filter-btn" onclick="window.setFilter('modif',this)">Modifications</button>
   </div>
   <div class="table-wrap">
     <table class="tbl">
@@ -362,12 +362,19 @@ async function loadCaisses(){
 }
 window.loadCaisses=loadCaisses;
 
+function caisseStatutType(c){
+  if(!c)return'absent';
+  if(c.statut==='valide')return'valide';
+  if((c.donnees_brouillon?.send_count||0)>1)return'modif';
+  return'recue';
+}
+
 function updateMetrics(){
   const all=Object.keys(GEMS_CONFIG).length;
   document.getElementById('cnt-total').textContent=all;
+  document.getElementById('cnt-recues').textContent=caisses.length;
   document.getElementById('cnt-ok').textContent=caisses.filter(c=>c.statut==='valide').length;
-  document.getElementById('cnt-warn').textContent=caisses.filter(c=>c.statut==='anomalie').length;
-  document.getElementById('cnt-wait').textContent=all-caisses.filter(c=>c.statut!=='en_attente'||true).length+caisses.filter(c=>c.statut==='en_attente').length+(all-caisses.length);
+  document.getElementById('cnt-modif').textContent=caisses.filter(c=>(c.donnees_brouillon?.send_count||0)>1).length;
 }
 
 window.setFilter=function(val,el){
@@ -377,16 +384,28 @@ window.setFilter=function(val,el){
   renderTable();
 };
 
+// Palette cohérente avec les cartes métriques
+const STATUT_COLORS={
+  absent:{bg:'#f5f5f5',text:'#888',border:'#ddd'},
+  recue:{bg:'#dbeafe',text:'#1d4ed8',border:'#93c5fd'},
+  modif:{bg:'#fef3c7',text:'#d97706',border:'#fcd34d'},
+  valide:{bg:'#dcfce7',text:'#16a34a',border:'#86efac'},
+};
+
 function renderTable(){
   const tbody=document.getElementById('tbody');
   const allGems=Object.keys(GEMS_CONFIG);
   let rows='';
   allGems.forEach(gem=>{
     const c=caisses.find(x=>x.gem===gem);
-    const statut=c?c.statut:'vide';
-    if(currentFilter==='tous'||(currentFilter==='valide'&&statut==='valide')||(currentFilter==='en_attente'&&(!c||statut==='en_attente'))||(currentFilter==='anomalie'&&statut==='anomalie')){
+    const type=caisseStatutType(c);
+    const col=STATUT_COLORS[type];
+    if(currentFilter==='tous'
+      ||(currentFilter==='valide'&&type==='valide')
+      ||(currentFilter==='recues'&&type==='recue')
+      ||(currentFilter==='modif'&&type==='modif')){
       const cfg=GEMS_CONFIG[gem];
-      const statutBadge=statut==='valide'?'<span class="badge b-ok">✓ Validé</span>':statut==='anomalie'?'<span class="badge b-err">⚠ Anomalie</span>':c?'<span class="badge b-warn">À vérifier</span>':'<span class="badge b-wait">En attente</span>';
+      const statutBadge=type==='valide'?'<span class="badge b-ok">✓ Validé</span>':type==='modif'?'<span class="badge b-warn">Modification</span>':c?'<span class="badge" style="background:#dbeafe;color:#1d4ed8">Reçue</span>':'<span class="badge b-wait">Non reçue</span>';
       const justif=c?c.statut_justificatifs:'—';
       const justifLabel={complets:'Complets',incomplets:'Incomplets',manquant:'Manquants'};
       const justifClass={complets:'ok',incomplets:'warn',manquant:'err'};
@@ -398,7 +417,7 @@ function renderTable(){
         ecart>0?`<span class="badge b-warn">+${fmt(ecart)} €</span>`:
         `<span class="badge b-err">${fmt(ecart)} €</span>`;
       rows+=`<tr onclick="window.openDetail('${gem}')">
-        <td style="font-weight:600">${gem}</td>
+        <td style="font-weight:700;background:${col.bg};color:${col.text};border-left:3px solid ${col.border}">${gem}</td>
         <td><span class="badge b-wait" style="font-size:10px">${cfg.anal}</span></td>
         <td style="color:#16a34a">${c?'+'+fmt(c.total_avances)+' €':'—'}</td>
         <td style="color:#dc2626">${c?'-'+fmt(c.total_depenses)+' €':'—'}</td>

@@ -1276,12 +1276,14 @@ async function envoyerCaisse(){
   const ta=avances.reduce((s,a)=>s+(a.montant||0),0);
   const solde=Math.round((soldePrecedent+ta+tp-td)*100)/100;
   const comptageActuel=sauvegarderComptageData();
+  const prevCount=caisseCourante?.donnees_brouillon?.send_count||0;
   const snapshotEnvoi={
     responsable:resp,
     deps:deps.map(d=>({...d,files:[]})),
     parts:parts.map(p=>({...p,files:[]})),
     avances,
-    is_snapshot:true
+    is_snapshot:true,
+    send_count:prevCount+1
   };
   let caisseId=null;
   try{
