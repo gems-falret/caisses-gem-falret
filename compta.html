@@ -311,7 +311,9 @@ const GEMS_CONFIG={
   'Versailles':{compte:'53103000',anal:'55/VE',journal:'CA03'},
   'Choisy':{compte:'53101000',anal:'91/G1',journal:'CA01'},
   'Vitry':{compte:'53102000',anal:'91/G2',journal:'CA02'},
+  'Coordinatrice':{compte:'53114000',anal:'55/CO',journal:'CA14'},
 };
+const GEMS_55=Object.entries(GEMS_CONFIG).filter(([,v])=>v.anal?.startsWith('55/')).map(([nom,v])=>({nom,...v}));
 
 const BILLETS=[200,100,50,20,10,5];
 const PIECES=[2,1,0.5,0.2,0.1,0.05,0.02,0.01];
@@ -320,6 +322,7 @@ const CATS_COMPTES={'Carburant':'60621000','Fournitures entretien':'60622000','F
 
 let USER=null,caisses=[],currentFilter='tous';
 let currentCaisse=null,currentDeps=[],currentParts=[],currentAvances=[];
+function isCoord(){return currentCaisse?.donnees_brouillon?.type==='coordinatrice';}
 let adjustments={},notesCompta={};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -523,19 +526,32 @@ window.openDetail=async function(gem){
           id:a.id,caisse_id:c.id,date_avance:a.date||null,montant:a.montant||0
         }));
     }
-    // Enrichir currentDeps avec les ventils du snapshot (montants par catégorie)
-    if(db?.deps?.length&&currentDeps.length){
-      currentDeps.forEach(dep=>{
-        const snap=db.deps.find(sd=>sd.fournisseur===dep.fournisseur&&(sd.date===dep.date_depense||!dep.date_depense));
-        if(snap?.ventils)dep.ventils=snap.ventils;
-      });
+    // Cas coordinatrice : charger depuis snapshot uniquement
+    if(db?.type==='coordinatrice'){
+      currentAvances=(db.retraits||[]).map((r,i)=>({id:r.id||i+1,caisse_id:c.id,date_avance:r.date||null,libelle:r.libelle||'',montant:r.montant||0,justificatif_url:r.justificatif_url||''}));
+      currentDeps=(db.deps||[]).map((d,i)=>({id:d.id||i+1,caisse_id:c.id,date_depense:d.date||null,fournisseur:d.libelle||d.fournisseur||'',categorie:d.cat?.label||'',compte:d.compte||'',montant:d.montant||0,gemAttribution:d.gemAttribution||'tous',cat:d.cat||null,justificatif_url:d.justificatif_url||''}));
+      currentParts=[];
+    } else {
+      // Enrichir currentDeps avec les ventils du snapshot (montants par catégorie)
+      if(db?.deps?.length&&currentDeps.length){
+        currentDeps.forEach(dep=>{
+          const snap=db.deps.find(sd=>sd.fournisseur===dep.fournisseur&&(sd.date===dep.date_depense||!dep.date_depense));
+          if(snap?.ventils)dep.ventils=snap.ventils;
+        });
+      }
     }
   }
 
   document.getElementById('vue-liste').style.display='none';
   document.getElementById('vue-detail').style.display='block';
   document.getElementById('btn-back').style.display='inline-block';
-  document.getElementById('topbar-title').textContent='GEM '+gem+' — '+moisNom();
+  const isC=currentCaisse?.donnees_brouillon?.type==='coordinatrice';
+  document.getElementById('topbar-title').textContent=(isC?'Coordinatrice':'GEM '+gem)+' — '+moisNom();
+  // Adapter les libellés des onglets
+  const tabAv=document.querySelector('.tab[onclick*="\'avances\'"]');
+  const tabPart=document.querySelector('.tab[onclick*="\'participations\'"]');
+  if(tabAv)tabAv.textContent=isC?'Retraits':'Avances';
+  if(tabPart)tabPart.textContent=isC?'N/A':'Participations';
 
   renderKpiGrid();
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -567,9 +583,9 @@ function renderKpiGrid(){
   const tPartCotis=currentParts.reduce((s,p)=>s+(p.montant||0),0);
   document.getElementById('kpi-grid').innerHTML=`
     <div class="kpi"><div class="kpi-label">Solde ouverture</div><div class="kpi-val">${fmt(c.solde_ouverture)} €</div></div>
-    <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">Avances reçues</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
+    <div class="kpi" style="border-color:#d1fae5"><div class="kpi-label">${isCoord()?'Retraits espèces':'Avances reçues'}</div><div class="kpi-val" style="color:#16a34a">+${fmt(c.total_avances)} €</div></div>
     <div class="kpi" style="border-color:#fecaca"><div class="kpi-label">Total dépenses</div><div class="kpi-val" style="color:#dc2626">-${fmt(c.total_depenses)} €</div></div>
-    <div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations / Adhésions</div><div class="kpi-val" style="color:#059669">+${fmt(tPartCotis)} €</div></div>
+    ${isCoord()?'':`<div class="kpi" style="border-color:#6ee7b7"><div class="kpi-label">Participations / Adhésions</div><div class="kpi-val" style="color:#059669">+${fmt(tPartCotis)} €</div></div>`}
     <div class="kpi" style="border-color:#bfdbfe"><div class="kpi-label">Solde théorique</div><div class="kpi-val" style="color:#1d4ed8">${fmt(c.solde_cloture)} €</div></div>
     <div class="kpi" style="border-color:#e5e7eb"><div class="kpi-label">Comptage caisse</div><div class="kpi-val" style="color:#1a1a1a">${tc!==null?fmt(tc)+' €':'—'}</div></div>
     <div class="kpi" style="border-color:${ecartColor};background:${ecart!==null&&Math.abs(ecart)<0.01?'#f0fdf4':ecart!==null&&ecart>0?'#fefce8':ecart!==null?'#fff5f5':'white'}">
@@ -636,22 +652,27 @@ function renderTabAvances(){
   const el=document.getElementById('tab-avances');
   const avances=currentAvances;
   const total=avances.reduce((s,a)=>s+(a.montant||0),0);
-  if(!avances.length){el.innerHTML='<div class="card"><div class="empty">Aucune avance enregistrée ce mois.</div></div>';return;}
+  const coord=isCoord();
+  const label=coord?'Retraits espèces':'Avances reçues';
+  const emptyMsg=coord?'Aucun retrait espèces ce mois.':'Aucune avance enregistrée ce mois.';
+  const totalLabel=coord?'Total retraits':'Total avances';
+  if(!avances.length){el.innerHTML=`<div class="card"><div class="empty">${emptyMsg}</div></div>`;return;}
   el.innerHTML=`
     <div class="card">
-      <div class="section-label">Avances reçues (${avances.length})</div>
+      <div class="section-label">${label} (${avances.length})${coord?' — compte 581':''}</div>
       <table class="tbl-inline">
-        <thead><tr><th>#</th><th>Date</th><th style="text-align:right">Montant</th></tr></thead>
+        <thead><tr><th>#</th><th>Date</th>${coord?'<th>Libellé</th>':''}<th style="text-align:right">Montant</th></tr></thead>
         <tbody>
           ${avances.map((a,i)=>`<tr>
             <td style="color:#888">${i+1}</td>
             <td>${a.date_avance||'—'}</td>
+            ${coord?`<td style="color:#555">${a.libelle||'—'}</td>`:''}
             <td style="text-align:right;color:#16a34a;font-weight:600">+${fmt(a.montant)} €</td>
           </tr>`).join('')}
         </tbody>
       </table>
       <div class="total-row">
-        <span>Total avances</span>
+        <span>${totalLabel}</span>
         <span style="color:#16a34a">+${fmt(total)} €</span>
       </div>
     </div>
@@ -694,6 +715,7 @@ function renderTabDepenses(){
         </div>
       </div>
       <div class="dep-body">
+        ${isCoord()&&d.gemAttribution?`<div style="margin-bottom:.5rem"><span style="font-size:11px;padding:2px 8px;border-radius:6px;background:${d.cat?.special?'#fef3c7':'#dbeafe'};color:${d.cat?.special?'#92400e':'#1d4ed8'};font-weight:600">📍 ${d.gemAttribution==='tous'?'Tous les GEMs (÷13)':d.gemAttribution}</span>${d.compte?`<span style="font-size:10px;color:#aaa;font-family:monospace;margin-left:6px">${d.compte}</span>`:''}</div>`:''}
         ${catLines}
         ${urls.length>0
           ?`<div class="justif-ok" style="margin-top:.5rem">✅ ${urls.map(u=>`<button class="justif-link" onclick="window.voirJustif('${u}')">📎 ${nomFichier(u)}</button>`).join('')}</div>`
@@ -712,6 +734,7 @@ function renderTabDepenses(){
 
 function renderTabParticipations(){
   const el=document.getElementById('tab-participations');
+  if(isCoord()){el.innerHTML='<div class="card"><div class="empty">Non applicable pour la caisse coordinatrice — pas de participations.</div></div>';return;}
   const parts=currentParts;
   if(!parts.length){
     el.innerHTML='<div style="border-left:3px solid #1D9E75;background:#E1F5EE;border-radius:0 14px 14px 0;padding:1.25rem"><div class="empty">Aucune participation enregistrée ce mois.</div></div>';
@@ -843,6 +866,36 @@ function renderTabEcriture(){
   const dateE=`31/${mp.reverse().join('/')}`;
 
   function buildRows(){
+    // ── Écriture coordinatrice ──────────────────────────────────────────────
+    if(isCoord()){
+      const rows=[];
+      // Dépenses avec attribution GEM
+      currentDeps.forEach(d=>{
+        const compte=d.compte||'60800000';
+        const lib=(d.categorie||d.fournisseur||'DEPENSE').toUpperCase();
+        const montant=d.montant||0;
+        const attr=d.gemAttribution||'tous';
+        if(attr==='tous'){
+          const part=Math.round(montant/13*100)/100;
+          GEMS_55.filter(g=>g.anal.startsWith('55/')).forEach(g=>{
+            rows.push({compte,anal:g.anal,lib,debit:part,credit:0,adj:false});
+          });
+        } else {
+          const gem=GEMS_55.find(g=>g.nom===attr);
+          rows.push({compte,anal:gem?.anal||'',lib,debit:Math.round(montant*100)/100,credit:0,adj:false});
+        }
+      });
+      // Retraits espèces → compte 581
+      const totalRetraits=currentAvances.reduce((s,a)=>s+(a.montant||0),0);
+      if(totalRetraits>0)rows.push({compte:'58100000',anal:'',lib:'RETRAITS ESPECES',debit:0,credit:Math.round(totalRetraits*100)/100,adj:false});
+      // Ajustements
+      (adjustments[c.id]||[]).forEach(a=>rows.push({...a,adj:true}));
+      // Solde caisse coordinatrice
+      const tD=rows.reduce((s,r)=>s+r.debit,0),tC=rows.reduce((s,r)=>s+r.credit,0);
+      rows.push({compte:'53114000',anal:'',lib:`CAISSE COORDINATRICE ${ref}`,debit:0,credit:Math.round((tD-tC)*100)/100,last:true});
+      return rows;
+    }
+    // ── Écriture GEM standard ───────────────────────────────────────────────
     const rows=[];
     const grouped={};
     currentDeps.forEach(d=>{
@@ -1258,13 +1311,38 @@ window.telechargerTousJustifs=async function(){
 // ── Éditeur comptable ─────────────────────────────────────────────────────────
 
 window._editData=null;
+window._editIsCoord=false;
+
+window._editSetDepGem=function(di,val){
+  if(!window._editData)return;
+  window._editData.deps[di].gemAttribution=val;
+  // Avance caisse : auto-remplir le compte avec celui du GEM sélectionné
+  const v=window._editData.deps[di].ventils?.[0];
+  if(v&&val!=='tous'){
+    const gem=GEMS_55.find(g=>g.nom===val);
+    if(gem&&v.compte?.startsWith('531'))v.compte=gem.compte;
+  }
+  window._renderEditModal();
+};
 
 window.ouvrirEditCaisse=function(){
   if(!currentCaisse)return;
   const c=currentCaisse;
   const cpt=c.comptage||{billets:{},pieces:{}};
   const snapDeps=c.donnees_brouillon?.deps||[];
-  window._editData={
+  window._editIsCoord=isCoord();
+  window._editData=window._editIsCoord?{
+    // Données coordinatrice
+    responsable:c.responsable||'',notes:c.notes||'',
+    avances:currentAvances.map(a=>({date:a.date_avance||'',libelle:a.libelle||'',montant:a.montant||0})),
+    deps:snapDeps.map(d=>({
+      date:d.date||'',fournisseur:d.libelle||d.fournisseur||'',
+      gemAttribution:d.gemAttribution||'tous',justificatif_url:d.justificatif_url||'',
+      ventils:[{libelle:d.cat?.label||'',compte:d.compte||'',montant:d.montant||0}]
+    })),
+    parts:[],
+    comptage:{billets:{...(cpt.billets||{})},pieces:{...(cpt.pieces||{})}},
+  }:{
     responsable:c.responsable||'',notes:c.notes||'',
     avances:currentAvances.map(a=>({date:a.date_avance||'',montant:a.montant||0})),
     deps:(snapDeps.length?snapDeps:currentDeps.map(d=>({date:d.date_depense,fournisseur:d.fournisseur,ventils:[{cat:{label:d.categorie,compte:d.compte},montant:d.montant}],justificatif_url:d.justificatif_url}))).map(d=>({
@@ -1272,7 +1350,7 @@ window.ouvrirEditCaisse=function(){
       ventils:(d.ventils||[{cat:{label:'Autres',compte:''},montant:0}]).map(v=>({libelle:v.cat?.label||'',compte:v.cat?.compte||'',montant:v.montant||0}))
     })),
     parts:(c.donnees_brouillon?.parts||currentParts).map(p=>({libelle:p.libelle||'',type:p.type||'participation',montant:p.montant||0,compte:p.compte||''})),
-    comptage:{billets:{...((cpt.billets)||{})},pieces:{...((cpt.pieces)||{})}},
+    comptage:{billets:{...(cpt.billets||{})},pieces:{...(cpt.pieces||{})}},
   };
   document.getElementById('edit-modal-subtitle').textContent='GEM '+c.gem+' — '+moisNom();
   window._renderEditModal();
@@ -1343,23 +1421,33 @@ window._renderEditModal=function(){
   const eb=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;
   const ic='class="edit-inp"';
 
-  const avHtml=`<div class="edit-section"><div class="edit-section-title est-blue">Avances reçues (${e.avances.length})</div>
-    <table class="edit-table"><thead><tr><th>Date</th><th>Montant</th><th></th></tr></thead><tbody>
+  const coord=window._editIsCoord;
+  const avTitle=coord?'Retraits espèces — compte 581':'Avances reçues';
+  const avAddLabel=coord?'+ Ajouter un retrait':'+ Ajouter une avance';
+  const avHtml=`<div class="edit-section"><div class="edit-section-title est-blue">${avTitle} (${e.avances.length})</div>
+    <table class="edit-table"><thead><tr><th>Date</th>${coord?'<th>Libellé</th>':''}<th>Montant</th><th></th></tr></thead><tbody>
     ${e.avances.map((a,i)=>`<tr>
       <td><input ${ic} type="date" value="${a.date}" onchange="window._editData.avances[${i}].date=this.value" ${eb}></td>
+      ${coord?`<td><input ${ic} type="text" value="${a.libelle||''}" placeholder="ex. Retrait BNP..." onchange="window._editData.avances[${i}].libelle=this.value" ${eb}></td>`:''}
       <td><input ${ic} type="number" style="text-align:right" value="${a.montant}" onchange="window._editData.avances[${i}].montant=parseFloat(this.value)||0;window._recalcEdit()" ${eb}></td>
       <td><button class="edit-del-btn" onclick="window._editData.avances.splice(${i},1);window._renderEditModal()">×</button></td>
     </tr>`).join('')}
     </tbody></table>
-    <button class="edit-add-btn" onclick="window._editData.avances.push({date:'',montant:0});window._renderEditModal()">+ Ajouter une avance</button></div>`;
+    <button class="edit-add-btn" onclick="window._editData.avances.push(${coord?'{date:\'\',libelle:\'\',montant:0}':'{date:\'\',montant:0}'});window._renderEditModal()">${avAddLabel}</button></div>`;
 
   const depHtml=`<div class="edit-section"><div class="edit-section-title est-red">Dépenses (${e.deps.length})</div>
     ${e.deps.map((d,di)=>{
       const dTot=d.ventils.reduce((s,v)=>s+(parseFloat(v.montant)||0),0);
-      return`<div style="border:1px solid #fca5a5;border-radius:8px;margin-bottom:8px;overflow:hidden">
-        <div style="display:grid;grid-template-columns:130px 1fr auto auto;gap:6px;align-items:center;padding:8px 10px;background:#fff5f5">
+      const gemSel=coord?('<select class="edit-inp" style="font-size:12px" onchange="window._editSetDepGem('+di+',this.value)">'
+        +'<option value="tous" '+((d.gemAttribution||'tous')==='tous'?'selected':'')+'>Tous les GEMs (÷13)</option>'
+        +GEMS_55.map(g=>'<option value="'+g.nom+'" '+(d.gemAttribution===g.nom?'selected':'')+'>'+g.nom+'</option>').join('')
+        +'</select>')
+        :'';
+      return`<div style="border:1px solid ${coord?'#bfdbfe':'#fca5a5'};border-radius:8px;margin-bottom:8px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:130px 1fr ${coord?'170px ':''}auto auto;gap:6px;align-items:center;padding:8px 10px;background:${coord?'#eff6ff':'#fff5f5'}">
           <input ${ic} type="date" value="${d.date}" onchange="window._editData.deps[${di}].date=this.value" ${eb}>
-          <input ${ic} type="text" placeholder="Fournisseur" value="${d.fournisseur||''}" onchange="window._editData.deps[${di}].fournisseur=this.value" ${eb}>
+          <input ${ic} type="text" placeholder="${coord?'Libellé':'Fournisseur'}" value="${d.fournisseur||''}" onchange="window._editData.deps[${di}].fournisseur=this.value" ${eb}>
+          ${gemSel}
           <span id="edit-dep-tot-${di}" style="font-weight:700;color:#b91c1c;white-space:nowrap">${_fmtE(dTot)} €</span>
           <button class="edit-del-btn" onclick="window._editData.deps.splice(${di},1);window._renderEditModal()">×</button>
         </div>
@@ -1378,7 +1466,7 @@ window._renderEditModal=function(){
     <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#fff5f5;border-radius:8px;margin-top:6px;font-weight:700;font-size:13px;color:#b91c1c"><span>Total dépenses</span><span id="edit-deps-grand-total">${_fmtE(td)} €</span></div></div>`;
 
   const to=v=>`<option value="participation" ${v!=='cotisation'?'selected':''}>Participation</option><option value="cotisation" ${v==='cotisation'?'selected':''}>Adhésion</option>`;
-  const partHtml=`<div class="edit-section"><div class="edit-section-title est-green">Participations / Adhésions (${e.parts.length})</div>
+  const partHtml=coord?'':`<div class="edit-section"><div class="edit-section-title est-green">Participations / Adhésions (${e.parts.length})</div>
     <table class="edit-table"><thead><tr><th>Libellé</th><th>Type</th><th>Compte</th><th>Montant</th><th></th></tr></thead><tbody>
     ${e.parts.map((p,i)=>`<tr>
       <td><input ${ic} type="text" value="${p.libelle||''}" onchange="window._editData.parts[${i}].libelle=this.value" ${eb}></td>
@@ -1389,7 +1477,7 @@ window._renderEditModal=function(){
     </tr>`).join('')}
     </tbody></table>
     <button class="edit-add-btn" onclick="window._editData.parts.push({libelle:'',type:'participation',montant:0,compte:''});window._renderEditModal()">+ Ajouter une ligne</button>
-    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#d1fae5;border-radius:8px;margin-top:6px;font-weight:700;font-size:13px;color:#065f46"><span>Total participations / adhésions</span><span id="edit-parts-grand-total">${_fmtE(tp)} €</span></div></div>`;
+    <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#d1fae5;border-radius:8px;margin-top:6px;font-weight:700;font-size:13px;color:#065f46"><span>Total participations / adhésions</span><span id="edit-parts-grand-total">${_fmtE(tp)} €</span></div></div>`
 
   // Comptage section
   const eb2=`onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"`;
@@ -1459,33 +1547,48 @@ window.sauvegarderEditCaisse=async function(){
     const snap={
       ...(currentCaisse.donnees_brouillon||{}),
       responsable:e.responsable,
-      avances:e.avances.map((a,i)=>({id:i+1,date:a.date,montant:parseFloat(a.montant)||0})),
-      deps:e.deps.map((d,i)=>({
-        id:i+1,date:d.date,fournisseur:d.fournisseur,
-        ventils:d.ventils.map((v,j)=>({id:(i+1)*100+j,cat:{label:v.libelle||'Autres',compte:v.compte||'',icon:CATS_ICONS[v.libelle]||'📦'},montant:parseFloat(v.montant)||0})),
-        files:[],justificatif_url:d.justificatif_url||''
-      })),
-      parts:e.parts.map((p,i)=>({
-        id:i+1,libelle:p.libelle,type:p.type,montant:parseFloat(p.montant)||0,compte:p.compte||'',
-        files:[],justificatif_url:currentParts[i]?.justificatif_url||''
-      })),
+      ...(window._editIsCoord?{
+        type:'coordinatrice',
+        retraits:e.avances.map((a,i)=>({id:i+1,date:a.date,libelle:a.libelle||'',montant:parseFloat(a.montant)||0})),
+        deps:e.deps.map((d,i)=>({id:i+1,date:d.date,libelle:d.fournisseur,fournisseur:d.fournisseur,
+          cat:d.ventils[0]?{label:d.ventils[0].libelle||'',compte:d.ventils[0].compte||'',icon:'📦'}:null,
+          compte:d.ventils[0]?.compte||'',gemAttribution:d.gemAttribution||'tous',
+          montant:parseFloat(d.ventils[0]?.montant)||0,files:[],justificatif_url:d.justificatif_url||''})),
+      }:{
+        avances:e.avances.map((a,i)=>({id:i+1,date:a.date,montant:parseFloat(a.montant)||0})),
+        deps:e.deps.map((d,i)=>({
+          id:i+1,date:d.date,fournisseur:d.fournisseur,
+          ventils:d.ventils.map((v,j)=>({id:(i+1)*100+j,cat:{label:v.libelle||'Autres',compte:v.compte||'',icon:CATS_ICONS[v.libelle]||'📦'},montant:parseFloat(v.montant)||0})),
+          files:[],justificatif_url:d.justificatif_url||''
+        })),
+        parts:e.parts.map((p,i)=>({
+          id:i+1,libelle:p.libelle,type:p.type,montant:parseFloat(p.montant)||0,compte:p.compte||'',
+          files:[],justificatif_url:currentParts[i]?.justificatif_url||''
+        })),
+      }),
       is_snapshot:true,send_count:currentCaisse.donnees_brouillon?.send_count||1,comptable_modifie:true
     };
     const newComptage={billets:{...e.comptage.billets},pieces:{...e.comptage.pieces}};
     const{error}=await supabase.from('caisses').update({
       responsable:e.responsable,notes:e.notes,
       total_avances:Math.round(ta*100)/100,total_depenses:Math.round(td*100)/100,
-      total_participations:Math.round(tp*100)/100,solde_cloture:solde,
+      total_participations:window._editIsCoord?0:Math.round(tp*100)/100,solde_cloture:solde,
       comptage:newComptage,donnees_brouillon:snap
     }).eq('id',currentCaisse.id);
     if(error)throw error;
     currentCaisse.responsable=e.responsable;currentCaisse.notes=e.notes;
     currentCaisse.total_avances=Math.round(ta*100)/100;currentCaisse.total_depenses=Math.round(td*100)/100;
-    currentCaisse.total_participations=Math.round(tp*100)/100;currentCaisse.solde_cloture=solde;
+    currentCaisse.total_participations=window._editIsCoord?0:Math.round(tp*100)/100;currentCaisse.solde_cloture=solde;
     currentCaisse.comptage=newComptage;currentCaisse.donnees_brouillon=snap;
-    currentAvances=snap.avances.map(a=>({...a,date_avance:a.date}));
-    currentDeps=snap.deps.map(d=>({...d,date_depense:d.date,categorie:d.ventils.map(v=>v.cat?.label||'').join(', '),compte:d.ventils.map(v=>v.cat?.compte||'').join(', '),montant:d.ventils.reduce((s,v)=>s+(v.montant||0),0)}));
-    currentParts=snap.parts.map(p=>({...p}));
+    if(window._editIsCoord){
+      currentAvances=(snap.retraits||[]).map(r=>({...r,date_avance:r.date}));
+      currentDeps=(snap.deps||[]).map(d=>({...d,date_depense:d.date,categorie:d.cat?.label||'',fournisseur:d.libelle||d.fournisseur||''}));
+      currentParts=[];
+    } else {
+      currentAvances=snap.avances.map(a=>({...a,date_avance:a.date}));
+      currentDeps=snap.deps.map(d=>({...d,date_depense:d.date,categorie:d.ventils.map(v=>v.cat?.label||'').join(', '),compte:d.ventils.map(v=>v.cat?.compte||'').join(', '),montant:d.ventils.reduce((s,v)=>s+(v.montant||0),0)}));
+      currentParts=snap.parts.map(p=>({...p}));
+    }
     window.fermerEditCaisse();
     renderKpiGrid();
     window.switchTab('resume',document.querySelector('.tab:first-child'));
