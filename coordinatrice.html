@@ -750,6 +750,30 @@ function buildRecap(){
 }
 
 // ── Sauvegarde brouillon ──────────────────────────────────────────────────────
+async function sauvegarderBrouillonSilent(){
+  const mois=document.getElementById('mois').value;
+  const resp=document.getElementById('responsable').value;
+  if(!mois)return;
+  const gemName=USER.gem||'Coordinatrice';
+  const snap={type:'coordinatrice',responsable:resp,
+    retraits:retraits.map(r=>({...r,files:[]})),
+    deps:deps.map(d=>({...d,files:[],ventils:d.ventils.map(v=>({...v,cat:v.cat||null}))})),
+    is_snapshot:false};
+  const tr=retraits.reduce((s,r)=>s+(r.montant||0),0);
+  const td=deps.reduce((s,d)=>s+depTotal(d),0);
+  const solde=Math.round((soldePrecedent+tr-td)*100)/100;
+  const payload={gem:gemName,mois,statut:'en_attente',statut_saisie:'brouillon',
+    responsable:resp,total_avances:Math.round(tr*100)/100,total_depenses:Math.round(td*100)/100,
+    total_participations:0,solde_ouverture:soldePrecedent,solde_cloture:solde,
+    donnees_brouillon:snap,dossier:USER.dossier||'55'};
+  if(caisseCourante){
+    await supabase.from('caisses').update(payload).eq('id',caisseCourante.id);
+  } else {
+    const{data}=await supabase.from('caisses').insert(payload).select().single();
+    if(data){caisseCourante=data;caissesMois[mois]='brouillon';renderFriseMois();}
+  }
+}
+
 window.sauvegarderBrouillon=async function(ev){
   const mois=document.getElementById('mois').value;
   const resp=document.getElementById('responsable').value;
@@ -772,8 +796,8 @@ window.sauvegarderBrouillon=async function(ev){
     const{data}=await supabase.from('caisses').insert(payload).select().single();
     if(data){caisseCourante=data;caissesMois[mois]='brouillon';renderFriseMois();}
   }
-  const btn=ev?.target||event?.target;
-  if(btn){const t=btn.textContent;btn.textContent='✓ Enregistré';setTimeout(()=>{btn.textContent=t;},1500);}
+  const btn=ev instanceof Event?ev.target:ev;
+  if(btn&&btn.textContent!==undefined){const t=btn.textContent;btn.textContent='✓ Enregistré';setTimeout(()=>{btn.textContent=t;},1500);}
 };
 
 // ── Envoi à la compta ─────────────────────────────────────────────────────────
@@ -824,14 +848,24 @@ function nomFichier(url){const b=url.split('/').pop();const i=b.indexOf('_');ret
 window.addDepFile=async function(id,input){
   const d=deps.find(x=>x.id===id);if(!d)return;
   const mois=document.getElementById('mois').value;
+  if(!mois){alert('Veuillez sélectionner un mois avant d\'ajouter un justificatif.');return;}
   for(const f of Array.from(input.files)){
     if(d.files.find(x=>x.name===f.name))continue;
     d.files.push(f);renderDeps();
-    const path=`${sanitize(USER.gem||'Coordinatrice')}/${mois}/depenses/${Date.now()}_${sanitize(f.name)}`;
-    const{data,error}=await supabase.storage.from('justificatifs').upload(path,f);
-    if(!error&&data){d.justificatif_url=d.justificatif_url?d.justificatif_url+','+data.path:data.path;await window.sauvegarderBrouillon();}
-    else{d.files=d.files.filter(x=>x.name!==f.name);alert('Erreur upload : '+(error?.message||'erreur'));}
-  }renderDeps();
+    const safeName=sanitize(f.name);
+    const gemPath=sanitize(USER.gem||'Coordinatrice');
+    const path=`${gemPath}/${mois}/depenses/${Date.now()}_${safeName}`;
+    const{data,error}=await supabase.storage.from('justificatifs').upload(path,f,{cacheControl:'3600',upsert:false});
+    if(!error&&data){
+      d.justificatif_url=d.justificatif_url?d.justificatif_url+','+data.path:data.path;
+      await sauvegarderBrouillonSilent();
+    } else {
+      console.error('Upload error:',error);
+      d.files=d.files.filter(x=>x.name!==f.name);
+      alert('Erreur upload : '+(error?.message||'erreur inconnue'));
+    }
+  }
+  renderDeps();
 };
 
 window.voirJustif=async function(path){
