@@ -416,16 +416,16 @@ async function init(){
   if(!stored){window.location.href='index.html';return;}
   USER=JSON.parse(stored);
   if(USER.role!=='coordinatrice'){window.location.href='index.html';return;}
-  document.getElementById('user-email').textContent=USER.email||USER.gem;
+  const gemName=USER.gem||'Coordinatrice';
+  document.getElementById('user-email').textContent=USER.email||gemName;
   // Accueil
-  const initiales=USER.gem.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  document.getElementById('gem-initiales-acc').textContent=initiales;
+  document.getElementById('gem-initiales-acc').textContent='📋';
   document.getElementById('gem-nom-acc').textContent='Bonjour, Coordinatrice 👋';
   document.getElementById('gem-dossier-acc').textContent='Caisse 53114 — Dossier 55';
-  // Form (en arrière-plan)
+  // Form
   document.getElementById('gem-nom').textContent='Coordinatrice';
   document.getElementById('gem-dossier').textContent='Caisse 53114 — Dossier 55';
-  document.getElementById('gem-initiales').textContent=initiales;
+  document.getElementById('gem-initiales').textContent='📋';
   await chargerFrise();
   renderFriseAccueil();
 }
@@ -494,7 +494,7 @@ async function ouvrirCompteRendu(moisStr){
   document.getElementById('modal-cr-titre').textContent='📊 Caisse '+MOIS_LONGS[moisIdx]+' '+annee;
   document.getElementById('modal-cr-content').innerHTML='<p style="color:#888;text-align:center;padding:1rem">Chargement...</p>';
   document.getElementById('modal-cr').classList.add('open');
-  const{data:c}=await supabase.from('caisses').select('*').eq('gem',USER.gem).eq('mois',moisStr).single();
+  const{data:c}=await supabase.from('caisses').select('*').eq('gem',USER.gem||'Coordinatrice').eq('mois',moisStr).single();
   if(!c){document.getElementById('modal-cr-content').innerHTML='<p style="color:#888;text-align:center;padding:1rem">Données introuvables.</p>';return;}
   const{data:ddeps}=await supabase.from('depenses').select('*').eq('caisse_id',c.id);
   const{data:pparts}=await supabase.from('participations').select('*').eq('caisse_id',c.id);
@@ -667,7 +667,7 @@ window.telechargerCaisseGemPdf=async function(){
     // En-tete
     doc.setFillColor(22,73,184);doc.rect(0,0,210,22,'F');
     doc.setTextColor(255,255,255);doc.setFontSize(15);doc.setFont(undefined,'bold');
-    doc.text(`Caisse GEM - ${c.gem||USER.gem}`,14,10);
+    doc.text(`Caisse GEM - ${c.gem||USER.gem||'Coordinatrice'}`,14,10);
     doc.setFontSize(9);doc.setFont(undefined,'normal');
     doc.text(`${moisNomStr}  |  Responsable : ${c.responsable||'-'}  |  Dossier : ${c.dossier||USER.dossier||'-'}`,14,17);
 
@@ -760,9 +760,9 @@ window.telechargerCaisseGemPdf=async function(){
     const tot=doc.internal.getNumberOfPages();
     for(let i=1;i<=tot;i++){
       doc.setPage(i);doc.setTextColor(160);doc.setFontSize(7.5);doc.setFont(undefined,'normal');
-      doc.text(`Fondation Falret - GEM ${c.gem||USER.gem} - ${moisNomStr} - Page ${i}/${tot}`,14,290);
+      doc.text(`Fondation Falret - GEM ${c.gem||USER.gem||'Coordinatrice'} - ${moisNomStr} - Page ${i}/${tot}`,14,290);
     }
-    doc.save(`caisse_${(c.gem||USER.gem).replace(/\s+/g,'_')}_${moisStr}.pdf`);
+    doc.save(`caisse_${(c.gem||USER.gem||'Coordinatrice').replace(/\s+/g,'_')}_${moisStr}.pdf`);
   }catch(e){console.error(e);alert('Erreur PDF : '+e.message);}
   finally{if(btn){btn.disabled=false;btn.textContent='📄 Telecharger PDF';}}
 };
@@ -788,10 +788,10 @@ async function updateMois(val){
   const prev=new Date(d.getFullYear(),d.getMonth()-1,1);
   const prevStr=prev.getFullYear()+'-'+(prev.getMonth()+1).toString().padStart(2,'0');
   document.getElementById('solde-mois-label').textContent='Solde de clôture — '+MOIS_LONGS[parseInt(prevStr.split('-')[1])-1]+' '+prevStr.split('-')[0];
-  const{data:prevData}=await supabase.from('caisses').select('solde_cloture').eq('gem',USER.gem).eq('mois',prevStr).single();
+  const{data:prevData}=await supabase.from('caisses').select('solde_cloture').eq('gem',USER.gem||'Coordinatrice').eq('mois',prevStr).single();
   soldePrecedent=prevData?prevData.solde_cloture:0;
   document.getElementById('solde-affiche').textContent=soldePrecedent.toFixed(2).replace('.',',')+' €';
-  const{data:existing}=await supabase.from('caisses').select('*').eq('gem',USER.gem).eq('mois',val).single();
+  const{data:existing}=await supabase.from('caisses').select('*').eq('gem',USER.gem||'Coordinatrice').eq('mois',val).single();
   caisseCourante=existing||null;
   moisValide=existing?.statut==='valide';
   const alertEl=document.getElementById('statut-alert');
@@ -999,7 +999,7 @@ async function addDepFile(id,input){
     d.files.push(f);
     renderDepList();
     const safeName=sanitizeStorageKey(f.name);
-    const path=`${sanitizeStorageKey(USER.gem)}/${mois}/depenses/${Date.now()}_${safeName}`;
+    const path=`${(USER.gem||'Coordinatrice').normalize('NFD').replace(/\p{M}/gu,'').replace(/[^a-zA-Z0-9.\-_]/g,'_')}/${mois}/depenses/${Date.now()}_${safeName}`;
     const{data,error}=await supabase.storage.from('justificatifs').upload(path,f);
     if(!error&&data){
       d.justificatif_url=d.justificatif_url?d.justificatif_url+','+data.path:data.path;
@@ -1096,7 +1096,7 @@ async function addDepFile(id,input){
     d.files.push(f);
     renderDepList();
     const safeName=sanitizeStorageKey(f.name);
-    const path=`${sanitizeStorageKey(USER.gem)}/${mois}/depenses/${Date.now()}_${safeName}`;
+    const path=`${(USER.gem||'Coordinatrice').normalize('NFD').replace(/\p{M}/gu,'').replace(/[^a-zA-Z0-9.\-_]/g,'_')}/${mois}/depenses/${Date.now()}_${safeName}`;
     const{data,error}=await supabase.storage.from('justificatifs').upload(path,f);
     if(!error&&data){
       d.justificatif_url=d.justificatif_url?d.justificatif_url+','+data.path:data.path;
@@ -1255,7 +1255,7 @@ function buildRecap(){
   const tf=(...cells)=>`<tfoot><tr style="background:#f8f8f8">${cells.map(([v,a,c])=>`<td style="padding:6px 7px;font-size:12px;font-weight:700;text-align:${a||'left'}${c?';color:'+c:''}">${v}</td>`).join('')}</tr></tfoot>`;
 
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid #f0f0f0">
-    <div style="font-size:14px;font-weight:700">${USER.gem}</div>
+    <div style="font-size:14px;font-weight:700">${USER.gem||'Coordinatrice'}</div>
     <div style="font-size:12px;color:#888">${mois} · ${resp}</div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:.75rem">
@@ -1363,7 +1363,7 @@ async function envoyerCaisse(){
     } else {
       // PREMIER ENVOI : insertion complète dans toutes les tables
       const{data,error}=await supabase.from('caisses').insert({
-        gem:USER.gem,dossier:USER.dossier,mois,responsable:resp,
+        gem:USER.gem||'Coordinatrice',dossier:USER.dossier,mois,responsable:resp,
         solde_ouverture:soldePrecedent,total_depenses:td,
         total_participations:tp,total_avances:ta,solde_cloture:solde,
         statut:'en_attente',statut_saisie:'envoye',notes:observations,
@@ -1373,7 +1373,7 @@ async function envoyerCaisse(){
       if(error)throw error;
       caisseId=data.id;
       for(const d of deps){
-        const newUrls=await uploadFiles(d.files||[],`${USER.gem}/${mois}/depenses`);
+        const newUrls=await uploadFiles(d.files||[],`${USER.gem||'Coordinatrice'}/${mois}/depenses`);
         const existingUrls=(d.justificatif_url||'').split(',').filter(u=>u.trim());
         const allUrls=[...existingUrls,...newUrls];
         await supabase.from('depenses').insert({
@@ -1384,7 +1384,7 @@ async function envoyerCaisse(){
         });
       }
       for(const p of parts){
-        const newUrls=await uploadFiles(p.files||[],`${USER.gem}/${mois}/participations`);
+        const newUrls=await uploadFiles(p.files||[],`${USER.gem||'Coordinatrice'}/${mois}/participations`);
         const existingUrls=(p.justificatif_url||'').split(',').filter(u=>u.trim());
         const allUrls=[...existingUrls,...newUrls];
         await supabase.from('participations').insert({
