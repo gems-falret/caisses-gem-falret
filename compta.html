@@ -422,9 +422,12 @@ const STATUT_COLORS={
 
 function renderTable(){
   const tbody=document.getElementById('tbody');
-  const allGems=Object.keys(GEMS_CONFIG);
+  const allGems=Object.keys(GEMS_CONFIG).filter(g=>g!=='Coordinatrice');
+  const allRows=[...allGems,'__sep__','Coordinatrice'];
   let rows='';
-  allGems.forEach(gem=>{
+  allRows.forEach(gem=>{
+    if(gem==='__sep__'){rows+=`<tr><td colspan="11" style="padding:4px 0;background:transparent"><div style="height:2px;background:linear-gradient(90deg,#0d3d6e,#1258a8,#0d3d6e);opacity:.25;border-radius:2px"></div></td></tr>`;return;}
+
     const c=caisses.find(x=>x.gem===gem);
     const type=caisseStatutType(c);
     const col=STATUT_COLORS[type];
@@ -444,12 +447,13 @@ function renderTable(){
         Math.abs(ecart)<0.01?'<span class="badge b-ok">✓ Conforme</span>':
         ecart>0?`<span class="badge b-warn">+${fmt(ecart)} €</span>`:
         `<span class="badge b-err">${fmt(ecart)} €</span>`;
-      rows+=`<tr onclick="window.openDetail('${gem}')">
-        <td style="font-weight:700;background:${col.bg};color:${col.text};border-left:3px solid ${col.border}">${gem}</td>
+      const isCoordRow=gem==='Coordinatrice';
+      rows+=`<tr onclick="window.openDetail('${gem}')" style="${isCoordRow?'background:#f0f4ff;':''}">
+        <td style="font-weight:700;background:${col.bg};color:${col.text};border-left:3px solid ${col.border}">${gem}${isCoordRow?'<span style="font-size:10px;margin-left:6px;background:#0d3d6e;color:white;padding:1px 6px;border-radius:4px;vertical-align:middle">COORD</span>':''}</td>
         <td><span class="badge b-wait" style="font-size:10px">${cfg.anal}</span></td>
         <td style="color:#16a34a">${c?'+'+fmt(c.total_avances)+' €':'—'}</td>
         <td style="color:#dc2626">${c?'-'+fmt(c.total_depenses)+' €':'—'}</td>
-        <td style="color:#16a34a">${c?'+'+fmt(c.total_participations)+' €':'—'}</td>
+        <td style="color:#16a34a">${isCoordRow?'<span style="color:#aaa;font-size:11px">N/A</span>':c?'+'+fmt(c.total_participations)+' €':'—'}</td>
         <td style="font-weight:600">${c?fmt(c.solde_cloture)+' €':'—'}</td>
         <td style="font-weight:600">${tc!==null?fmt(tc)+' €':'<span style="color:#ccc">—</span>'}</td>
         <td>${ecartCell}</td>
@@ -526,10 +530,17 @@ window.openDetail=async function(gem){
           id:a.id,caisse_id:c.id,date_avance:a.date||null,montant:a.montant||0
         }));
     }
-    // Cas coordinatrice : charger depuis snapshot uniquement
+    // Cas coordinatrice : charger depuis snapshot uniquement (structure ventils par GEM)
     if(db?.type==='coordinatrice'){
       currentAvances=(db.retraits||[]).map((r,i)=>({id:r.id||i+1,caisse_id:c.id,date_avance:r.date||null,libelle:r.libelle||'',montant:r.montant||0,justificatif_url:r.justificatif_url||''}));
-      currentDeps=(db.deps||[]).map((d,i)=>({id:d.id||i+1,caisse_id:c.id,date_depense:d.date||null,fournisseur:d.libelle||d.fournisseur||'',categorie:d.cat?.label||'',compte:d.compte||'',montant:d.montant||0,gemAttribution:d.gemAttribution||'tous',cat:d.cat||null,justificatif_url:d.justificatif_url||''}));
+      currentDeps=(db.deps||[]).map((d,i)=>({
+        id:d.id||i+1,caisse_id:c.id,date_depense:d.date||null,fournisseur:d.libelle||d.fournisseur||'',
+        ventils:(d.ventils||[]).map(v=>({...v,cat:v.cat||null})),
+        categorie:(d.ventils||[]).map(v=>v.cat?.label||'').join(', '),
+        compte:(d.ventils||[]).map(v=>v.compte||'').join(', '),
+        montant:(d.ventils||[]).reduce((s,v)=>s+(v.montant||0),0),
+        justificatif_url:d.justificatif_url||''
+      }));
       currentParts=[];
     } else {
       // Enrichir currentDeps avec les ventils du snapshot (montants par catégorie)
@@ -866,31 +877,30 @@ function renderTabEcriture(){
   const dateE=`31/${mp.reverse().join('/')}`;
 
   function buildRows(){
-    // ── Écriture coordinatrice ──────────────────────────────────────────────
+    // ── Écriture coordinatrice (ventils par GEM) ────────────────────────────
     if(isCoord()){
       const rows=[];
-      // Dépenses avec attribution GEM
+      const gems55=GEMS_55.filter(g=>g.anal.startsWith('55/'));
+      // Chaque ventil de chaque dépense
       currentDeps.forEach(d=>{
-        const compte=d.compte||'60800000';
-        const lib=(d.categorie||d.fournisseur||'DEPENSE').toUpperCase();
-        const montant=d.montant||0;
-        const attr=d.gemAttribution||'tous';
-        if(attr==='tous'){
-          const part=Math.round(montant/13*100)/100;
-          GEMS_55.filter(g=>g.anal.startsWith('55/')).forEach(g=>{
-            rows.push({compte,anal:g.anal,lib,debit:part,credit:0,adj:false});
-          });
-        } else {
-          const gem=GEMS_55.find(g=>g.nom===attr);
-          rows.push({compte,anal:gem?.anal||'',lib,debit:Math.round(montant*100)/100,credit:0,adj:false});
-        }
+        (d.ventils||[]).forEach(v=>{
+          const compte=v.compte||v.cat?.compte||'60800000';
+          const lib=(v.cat?.label||d.fournisseur||'DEPENSE').toUpperCase();
+          const montant=v.montant||0;
+          const attr=v.gemAttribution||'tous';
+          if(attr==='tous'){
+            const part=Math.round(montant/gems55.length*100)/100;
+            gems55.forEach(g=>rows.push({compte,anal:g.anal,lib,debit:part,credit:0,adj:false}));
+          } else {
+            const gem=GEMS_55.find(g=>g.nom===attr);
+            rows.push({compte,anal:gem?.anal||'',lib,debit:Math.round(montant*100)/100,credit:0,adj:false});
+          }
+        });
       });
       // Retraits espèces → compte 581
       const totalRetraits=currentAvances.reduce((s,a)=>s+(a.montant||0),0);
       if(totalRetraits>0)rows.push({compte:'58100000',anal:'',lib:'RETRAITS ESPECES',debit:0,credit:Math.round(totalRetraits*100)/100,adj:false});
-      // Ajustements
       (adjustments[c.id]||[]).forEach(a=>rows.push({...a,adj:true}));
-      // Solde caisse coordinatrice
       const tD=rows.reduce((s,r)=>s+r.debit,0),tC=rows.reduce((s,r)=>s+r.credit,0);
       rows.push({compte:'53114000',anal:'',lib:`CAISSE COORDINATRICE ${ref}`,debit:0,credit:Math.round((tD-tC)*100)/100,last:true});
       return rows;
